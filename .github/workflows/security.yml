@@ -178,6 +178,10 @@ jobs:
           bash scripts/uv-sync-retry.sh
           uv run --with pip-audit pip-audit
 
+      - name: Audit upstream versions of fork backports
+        continue-on-error: true
+        run: python scripts/audit-fork-dependencies.py
+
       # Same bun as package.json packageManager (tests/test_bun_toolchain_pins.py).
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0

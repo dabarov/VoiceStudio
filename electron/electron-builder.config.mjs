@@ -90,6 +90,7 @@ export default {
     },
     { from: '../pyproject.toml', to: 'pyproject.toml' },
     { from: '../uv.lock', to: 'uv.lock' },
+    { from: '../vendor/python/wheels', to: 'vendor/python/wheels' },
     { from: '../README.md', to: 'README.md' },
     { from: '../LICENSE', to: 'LICENSE' },
     { from: '../LICENSE-NOTICE.md', to: 'LICENSE-NOTICE.md' },

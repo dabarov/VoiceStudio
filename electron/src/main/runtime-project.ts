@@ -18,6 +18,7 @@ const SOURCES = [
   'backend',
   'config',
   'omnivoice',
+  'vendor',
   'pyproject.toml',
   'uv.lock',
   'README.md',

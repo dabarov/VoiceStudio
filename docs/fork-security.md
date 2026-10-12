@@ -33,26 +33,54 @@ not a signed release or a claim that all vulnerabilities have been removed.
   variable cannot enable them. Re-enabling requires an intentional source change,
   a review of the target release channel, and a new build.
 
+## Model source and dependency hardening (2026-10-13)
+
+- The legacy Nano loader pins both the model revision and executable-code
+  revision. Its audio tokenizer uses a separately pinned local snapshot. The
+  Nano sidecar also resolves both snapshots before handing them to the runtime.
+- MOSS v1.5 resolves its model and codec independently and passes local-only paths
+  to the processor/model. A mutable branch name cannot accidentally become a
+  codec code revision. Pins prevent silent upstream changes; they do not turn
+  downloaded Python into a sandbox.
+- Custom Nano models/codecs require an explicit trust setting and an immutable
+  SHA for each override. Custom local directories are rejected because a Hub
+  revision does not authenticate their contents. v1.5 also rejects this bypass.
+- Compatible JavaScript upgrades remove 15 of the 17 reported advisory findings.
+  The two packages without fixed published releases have maintained patches:
+  `braces` rejects excessive parser nesting before recursive AST traversal, and
+  the used `sprintf-js` entrypoint clamps numeric precision to ECMAScript limits.
+  Invalid brace patterns still raise a normal parsing error; callers must handle
+  invalid input. The unused standalone browser distribution of sprintf-js is not
+  imported by the app and is not covered by this patch.
+- Setuptools is upgraded to 84.0.0. The locked WhisperX, faster-whisper and
+  pyannote wheels no longer directly import `pkg_resources`.
+- Accelerate, Stanza and NLTK use reproducible, locally patched wheels. Accelerate
+  contains shard paths and rejects special files while preserving valid Hub cache
+  links; Stanza always requests restricted checkpoint deserialization; NLTK model
+  reads/writes use its existing path-security checks. The patches retain the
+  dependency versions required by Argos and the speech libraries.
+
+See [backport provenance and maintenance](../vendor/python/README.md). The
+patched wheels ship with desktop resources and are staged during setup. Docker
+and Colab explicitly include the local wheel directory. Source installs use
+`uv sync --frozen`; a manual pip install must include
+`--find-links vendor/python/wheels` and the existing torch constraints.
+
 ## Remaining work before installation
 
-The Python lock still has advisory matches for Accelerate, NLTK, setuptools,
-Stanza, and PyTorch. A database match alone does not prove that an application
-exposes the affected function, but these entries are not resolved by this patch.
-In particular:
+PyTorch 2.8.0 still matches three distinct advisories. Its native stack and the
+optional engine environments need a coordinated upgrade and functional testing.
+Some engines pin older PyTorch versions independently of the main environment.
+The source changes above do not silently override those requirements or certify
+those engines. The newer TorchAudio 2.11 stable ABI can work with PyTorch 2.13+,
+but the application still has older consumers (including pyannote 3.x) that use
+removed audio APIs. Compatibility work is proceeding with all engines retained;
+changing the version number alone is insufficient.
 
-- Accelerate 1.15.0 still joins untrusted checkpoint shard paths without a
-  containment check; merely upgrading past the advisory's last listed version
-  would not establish that the bug is fixed.
-- Argos Translate 1.11.0 requires Stanza 1.10.1, while the unsafe checkpoint
-  fallback is fixed in Stanza 1.12.2. Upgrading requires compatibility work rather
-  than silently overriding that dependency requirement.
-- PyTorch upgrades must be coordinated with torchaudio, torchvision and the
-  platform-specific engine environments. The current pins remain unchanged.
-- The setuptools advisory concerns source-distribution building on macOS; the
-  app retains its older version for `pkg_resources` compatibility.
-- Optional engines can execute downloaded Python code or deserialize checkpoints.
-  Pinning a model is useful but does not establish that all its code and nested
-  dependencies have been audited. These engines need separate review.
+Advisory scanners still identify locally backported upstream versions. Run
+`python scripts/audit-fork-dependencies.py` to include the upstream versions of
+our local wheels in scans, and run the backport regressions to verify the fixes.
+No advisory is silently suppressed. This is not a claim of zero vulnerabilities.
 
 Keep the app local, leave optional agent features and network sharing off unless
 needed, and do not supply personal tokens or voice samples during validation.

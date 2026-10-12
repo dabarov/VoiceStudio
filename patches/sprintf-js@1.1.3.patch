@@ -1,0 +1,15 @@
+diff --git a/src/sprintf.js b/src/sprintf.js
+index 65d6324645ef1d0133614a71497751009dc5c912..aa30854e9a07d648ef9c28e5eabbfe9146ded9db 100644
+--- a/src/sprintf.js
++++ b/src/sprintf.js
+@@ -155,6 +155,10 @@
+                 parse_tree.push('%')
+             }
+             else if ((match = re.placeholder.exec(_fmt)) !== null) {
++                // Bound numeric precision before calling ECMAScript formatters.
++                if (match[7] !== undefined && /[efg]/.test(match[8])) {
++                    match[7] = String(Math.max(match[8] === 'g' ? 1 : 0, Math.min(100, Number(match[7]))))
++                }
+                 if (match[2]) {
+                     arg_names |= 1
+                     var field_list = [], replacement_field = match[2], field_match = []

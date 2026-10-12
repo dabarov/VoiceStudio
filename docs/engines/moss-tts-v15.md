@@ -129,6 +129,13 @@ default voice. `duration` (seconds) maps to MOSS's `tokens` argument at
 
 ## Common errors
 
+This security fork resolves the built-in model at
+`cdd3b911b1585e3f2dbc7775ef10f9926f58850a` and its audio codec independently
+at `3cd226ba2947efa357ef453bcad111b6eafba782`. Both loaders receive local
+snapshot paths. A model's commit is never used as the codec's revision.
+Custom model overrides must be Hub repository names with the trust setting
+and immutable commit above; local-directory overrides are rejected.
+
 ### `MOSS-TTS-v1.5 venv not found. Set OMNIVOICE_MOSS_TTS_V15_DIR ...`
 
 You haven't pointed VoiceStudio at a MOSS-TTS clone yet. Follow **Install**.

@@ -57,6 +57,7 @@ async function fixture() {
   await mkdir(join(bundle, 'config'), { recursive: true });
   await mkdir(join(bundle, 'frontend', 'dist'), { recursive: true });
   await mkdir(join(bundle, 'omnivoice'));
+  await mkdir(join(bundle, 'vendor'), { recursive: true });
   for (const file of [
     'pyproject.toml',
     'README.md',

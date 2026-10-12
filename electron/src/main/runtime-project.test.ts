@@ -41,6 +41,8 @@ async function fixture() {
   await mkdir(join(bundle, 'config'), { recursive: true });
   await mkdir(join(bundle, 'frontend', 'dist'), { recursive: true });
   await mkdir(join(bundle, 'omnivoice'));
+  await mkdir(join(bundle, 'vendor', 'python', 'wheels'), { recursive: true });
+  await writeFile(join(bundle, 'vendor', 'python', 'wheels', 'patched.whl'), 'patched dependency');
   for (const file of [
     'pyproject.toml',
     'uv.lock',
@@ -494,6 +496,7 @@ describe('packaged runtime setup', () => {
     expect(existsSync(join(project, 'frontend'))).toBe(false);
     expect(existsSync(join(project, 'backend', 'main.py'))).toBe(true);
     expect(await readFile(join(project, 'config', 'app.json'), 'utf8')).toBe('config/app.json');
+    expect(await readFile(join(project, 'vendor', 'python', 'wheels', 'patched.whl'), 'utf8')).toBe('patched dependency');
   });
   it('replaces obsolete bundled modules without removing the interpreter or user files', async () => {
     const { bundle, project } = await fixture();

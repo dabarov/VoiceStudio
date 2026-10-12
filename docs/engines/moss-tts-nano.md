@@ -86,6 +86,18 @@ download runs out of time, raise the compute-time budget in
 
 ## Troubleshooting
 
+### Security fork model revisions
+
+This fork resolves the built-in model (including the `-100M` alias) at
+`44502f80dbf9743528fa921cc544d662c685ebec` and its audio tokenizer at
+`6aa02b01e445cc585582cf0ba480bc3ea6c8dd68`. Both are immutable snapshots;
+generation does not follow the repositories' changing default branches.
+Custom repositories require `OMNIVOICE_MOSS_TTS_TRUST_REMOTE_CODE=1` after
+review, plus the corresponding `OMNIVOICE_MOSS_TTS_MODEL_REVISION` or
+`OMNIVOICE_MOSS_TTS_TOKENIZER_REVISION` commit SHA. These overrides accept
+Hub repository names, not unauthenticated local directories. Pinning code
+does not isolate it from the operating system.
+
 - "moss_tts_nano package not installed": run the clone + `uv pip install -e .`
   steps above.
 - Entry-point errors after an upstream update: see "Upstream is unpinned"

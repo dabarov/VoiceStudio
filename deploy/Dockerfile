@@ -18,6 +18,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY electron/package.json ./electron/
 COPY config/ ./config/
+COPY patches/ ./patches/
 
 RUN bun install --frozen-lockfile
 
@@ -70,6 +71,7 @@ RUN python3 -m pip install --no-cache-dir uv
 # Copy python packaging specs (README.md required by hatchling metadata)
 COPY pyproject.toml uv.lock README.md ./
 COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
+COPY vendor/python/wheels/ ./vendor/python/wheels/
 
 # Install the project (non-editable — no need for -e in containers).
 # Uses `uv` for exponentially faster resolution than plain pip.
@@ -92,7 +94,7 @@ COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
 # segment, so they match the base image's +cu128 / +rocm6.4 builds rather than
 # replacing them.
 RUN uv pip install --python "$(command -v python3)" --no-cache \
-    --constraint deploy/torch-constraints.txt .
+    --constraint deploy/torch-constraints.txt --find-links vendor/python/wheels .
 
 # Guard (fails the build, not the user at runtime): assert the dependency
 # install did NOT replace the base image's GPU torch. A future dep bump that

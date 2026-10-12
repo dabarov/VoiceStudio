@@ -50,3 +50,26 @@ base. This patch adds download bounds, translation environment isolation and
 fork update isolation. Python dependency advisory matches and optional model
 code remain under review. See fork-security.md; no production installation was
 performed and this source branch must not be represented as security-certified.
+
+2026-10-13 HARDENING CHECKPOINT (native runtime upgrade still pending)
+- Bun 1.4.2, the repository's declared version, is now used. Fresh frozen install
+  with lifecycle scripts disabled succeeded, including the two local patches.
+- Electron/shared suites: 4,346 passed, 2 skipped; typecheck, both frontend
+  builds and packaging contract passed. Subsequent vendor-resource staging
+  change passed 52 targeted runtime tests, 2 skipped.
+- Frontend/script suite: 111 passed. The two dependency regressions fail before
+  the braces/sprintf-js source patches and pass afterwards.
+- Backend model pins, actual patched dependencies, wheel integrity/distribution
+  and audit lookup tests: 78 passed, 2 third-party source syntax warnings.
+- Accelerate, Stanza and NLTK regressions reproduced unsafe behavior in the
+  original libraries and passed with the backports; no real credentials used.
+- Complete root backend environment installed from uv.lock in an isolated test
+  directory (Python 3.11). This is not the production desktop installation.
+- A prior Python 3.12 frozen environment imported faster-whisper, WhisperX ASR
+  and alignment, Argos translation and pyannote with setuptools 84 successfully.
+- Optional engine environments and a patched native PyTorch stack remain under
+  compatibility testing. Every engine remains present. No security clearance,
+  signed installer, production app launch or real voice generation is claimed.
+- Repeated on the complete Python 3.11 environment: 19 actual-library,
+  distribution, audit and offline import tests passed; 91 security regression
+  tests passed. TypeScript typecheck passed after the resource-staging change.

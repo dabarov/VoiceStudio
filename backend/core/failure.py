@@ -132,7 +132,7 @@ _HINTS: dict[str, str] = {
     # was told to go and check their engine instead. A separate class (not a
     # wider GPU_OOM) because the remedy differs: free system RAM, not VRAM.
     "HOST_MEMORY_EXHAUSTED": "The machine ran out of memory during generation. Close other memory-heavy apps and browser tabs, unload models you are not using with Flush models, render a shorter passage, or select a lighter TTS engine. On Windows, enlarging the page file also gives a large engine room to load.",
-    "PKG_RESOURCES_MISSING": "Run `uv pip install --reinstall 'setuptools>=75,<80'` in the backend venv (a plain install is skipped when setuptools' metadata is present but its pkg_resources files were removed by antivirus). Restart after.",
+    "PKG_RESOURCES_MISSING": "Repair the backend from this fork's locked dependencies (or run `uv sync --frozen` in its checkout), then restart. An older package still imports pkg_resources; update that package rather than downgrading setuptools below 83.",
     "GATEKEEPER_QUARANTINE": "Clear the macOS quarantine flag (xattr -cr the app), then reopen.",
     "APPIMAGE_WEBKIT_WHITESCREEN": "Launch with WEBKIT_DISABLE_DMABUF_RENDERER=1 set.",
     "HF_AUTH_FAILED": "Set a valid HF_TOKEN in Settings → Hugging Face and retry. If the model is gated, open its Hugging Face page and accept its access terms first.",

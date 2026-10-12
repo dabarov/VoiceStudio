@@ -244,6 +244,7 @@ def test_loader_device_matches_routing(monkeypatch, family, legacy, probe_raises
     ))
     monkeypatch.setattr(main, '_state', None)
     monkeypatch.setattr(main, '_model_source', lambda: ('local-fixture', 'a' * 40))
+    monkeypatch.setattr(main, '_snapshot_path', lambda repo, revision: '/snapshots/' + revision)
     state = main._load_model(io.BytesIO())
     if not legacy:
         accelerator.assert_called_once_with(check_available=True)
