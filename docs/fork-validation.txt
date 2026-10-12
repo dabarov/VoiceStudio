@@ -61,6 +61,15 @@ INSTALLATION
 - The app completed its normal frozen first-run runtime installation. Installed
   metadata confirms the patched native stack, all main security backports,
   pyannote/WhisperX compatibility wheels and the audio adapter.
+- Restarted after the final installer correction; both the app bundle and the
+  managed runtime contain the reviewed backend source. /health, /sysinfo and
+  /engines returned 200 after restart, and the UI showed Engine ready. Only
+  127.0.0.1:3900 was listening for this backend.
+- Starter models completed installation: k2-fsa/OmniVoice,
+  Systran/faster-whisper-base and csukuangfj/sherpa-onnx-whisper-tiny. No active
+  downloads remained. Voice generation displayed a model-licence acceptance
+  requirement; no licence was accepted on the user's behalf and no TTS output
+  is claimed in this validation.
 
 LIMITATIONS
 - No complete TTS synthesis across every engine, voice-cloning quality test,
