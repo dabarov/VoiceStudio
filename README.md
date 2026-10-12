@@ -1,3 +1,8 @@
+> **Security fork:** this branch includes local security hardening and disables
+> upstream desktop updates. The installer links below belong to the original
+> project and do not contain this branch's patches. Read
+> [the fork's security notes](docs/fork-security.md) before building or installing.
+
 <div align="center">
   <img src="docs/logo.png" alt="VoiceStudio" width="88" />
   <h1>VoiceStudio</h1>

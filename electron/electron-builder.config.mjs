@@ -8,7 +8,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packageNativeHelper } from './native-helper-build.mjs';
-import { APP_ID, PRODUCT_NAME } from '../config/app-config.mjs';
+import { APP_ID, PRODUCT_NAME, DESKTOP_UPDATES_ENABLED } from '../config/app-config.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { version } = JSON.parse(readFileSync(resolve(here, '../package.json'), 'utf-8'));
@@ -137,9 +137,11 @@ export default {
     target: ['AppImage', 'deb'],
     category: 'Audio',
   },
-  publish: {
-    provider: 'generic',
-    url: updateUrl,
-    channel: updateChannel,
-  },
+  publish: DESKTOP_UPDATES_ENABLED
+    ? {
+        provider: 'generic',
+        url: updateUrl,
+        channel: updateChannel,
+      }
+    : null,
 };

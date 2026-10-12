@@ -161,7 +161,7 @@ async def segmented_download(
 
         # Single-stream fallback: server won't range, or we don't know the size.
         if not accepts_ranges or not size:
-            await _stream_single(client, final_url, token, part, on_bytes, _cancelled)
+            await _stream_single(client, final_url, token, part, on_bytes, _cancelled, size)
         else:
             done = _load_done(part, size)
             _preallocate(part, size)
@@ -190,6 +190,10 @@ async def segmented_download(
                         async for chunk in r.aiter_bytes(_READ_CHUNK):
                             if _cancelled():
                                 raise DownloadCancelled()
+                            # A post-write size check is too late: this range
+                            # could already have overwritten a completed sibling.
+                            if len(chunk) > want - got:
+                                raise ValueError(f"segment {start}-{end} exceeds its requested range")
                             fh.write(chunk)
                             got += len(chunk)
                             if on_bytes:
@@ -252,14 +256,18 @@ async def _gather_or_cancel(coros) -> None:
             raise t.exception()
 
 
-async def _stream_single(client, url, token, part, on_bytes, cancelled) -> None:
+async def _stream_single(client, url, token, part, on_bytes, cancelled, expected_size=None) -> None:
     async with client.stream("GET", url, headers=_auth_headers(url, token)) as r:
         r.raise_for_status()
+        got = 0
         with open(part, "wb") as fh:
             async for chunk in r.aiter_bytes(_READ_CHUNK):
                 if cancelled():
                     raise DownloadCancelled()
+                if expected_size is not None and len(chunk) > expected_size - got:
+                    raise ValueError("download exceeds its expected size")
                 fh.write(chunk)
+                got += len(chunk)
                 if on_bytes:
                     on_bytes(len(chunk))
 

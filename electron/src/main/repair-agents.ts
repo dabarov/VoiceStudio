@@ -22,6 +22,7 @@ import { startRepairApiBridge, type RepairApiBridge } from './repair-api-bridge'
 import { isTrustedRenderer } from './trusted-renderer';
 import { agentUsesAppWorkspace, featureGuidance, validateAgentWorkspace } from '../shared/agent-workspace';
 import { envWithToolPath } from './tool-path';
+import { translationEnvironment } from './translation-env';
 import { sendToLiveWindow } from './window-safety';
 import { startLlmAgentBridge } from './llm-agent-bridge';
 import type {
@@ -1016,10 +1017,7 @@ export async function registerRepairAgents(
         translationChild = spawn(command.executable, args, {
           cwd: translationTemp!,
           env: {
-            ...envWithToolPath(),
-            // Agent subprocesses must not inherit the backend-only capability.
-            VOICESTUDIO_LLM_AGENT_TOKEN: undefined,
-            VOICESTUDIO_LLM_AGENT_URL: undefined,
+            ...translationEnvironment(),
             ...(command.prefix.length ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
             NO_COLOR: '1',
             FORCE_COLOR: '0',

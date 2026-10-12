@@ -1,6 +1,7 @@
 {
   "productName": "VoiceStudio",
   "appId": "com.voicestudio.desktop",
+  "desktopUpdatesEnabled": false,
   "ports": {
     "backend": 3900,
     "web": 3901,
