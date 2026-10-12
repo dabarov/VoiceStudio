@@ -33,6 +33,18 @@ def queries_for_lock(lock, root=ROOT):
 
 def audit(lock):
     queries, sources = queries_for_lock(lock)
+    # Optional engines have separate environments. Include every shipped
+    # backport even when it is absent from the main application's lock.
+    known = {(q["package"]["name"].replace("_", "-"), q["version"]) for q in queries}
+    for wheel in json.loads((ROOT / "vendor/python/wheel-manifest.json").read_text()):
+        path = ROOT / "vendor/python" / wheel["path"]
+        if hashlib.sha256(path.read_bytes()).hexdigest() != wheel["sha256"]:
+            raise ValueError(f"Shipped wheel differs from manifest: {wheel['name']}")
+        name, version = wheel["name"].replace("_", "-"), wheel["version"].split("+", 1)[0]
+        if (name, version) not in known:
+            queries.append({"package": {"name": name, "ecosystem": "PyPI"}, "version": version})
+            sources.append({"installed_version": wheel["version"],
+                            "source": {"path": str(path.relative_to(ROOT))}, "local_backport": True})
     matches = []
     for offset in range(0, len(queries), 100):
         batch = queries[offset:offset + 100]

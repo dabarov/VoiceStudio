@@ -289,7 +289,7 @@ def test_managed_install_probes_late_imports_and_restores_dependencies():
     assert 'cosyvoice.dataset.processor' in spec.probe_code
     assert 'matcha.utils' in spec.probe_code
     assert '{checkout}/third_party/PyWorld' in spec.install_args
-    assert spec.install_revision == 'security-floors-v3'
+    assert spec.install_revision == 'security-floors-v3-native-torch-2.13-v1'
     sources = {source.path: source for source in spec.extra_sources}
     assert sources['third_party/PyWorld'].revision == 'f31ad88d543fdaebbda2d0c9a5e4d4f991ae0b6c'
     assert sources['third_party/PyWorld/lib/World'].revision == 'd625e7608ca23a870018f01e7c562ac683d9847f'
@@ -369,7 +369,7 @@ def test_load_preserves_legacy_non_qwen_checkout(monkeypatch, tmp_path):
 # requirements.txt needs a new revision, or existing installs keep their old
 # completion marker and never receive the change.
 _REQUIREMENTS_BY_REVISION = {
-    "security-floors-v3": "10d15c52b78ae41cfd040880f97a3b9b71c2fa2dab9893bceb982fc46b72d9dd",
+    "security-floors-v3-native-torch-2.13-v1": "83dd6d75e4b550b9f6c064717aabf54136d380c82fb6a2f5aabeaa4e9ba763bd",
 }
 
 

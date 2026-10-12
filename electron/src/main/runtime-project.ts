@@ -25,18 +25,18 @@ const SOURCES = [
   'LICENSE',
 ];
 export const UV_VERSION = '0.12.13';
-export const CUDNN8_COMPAT_PIN = 'nvidia-cudnn-cu12==8.9.7.29';
-export const ROCM_TORCH_INDEX = 'https://download.pytorch.org/whl/rocm6.4';
+export const CUDNN_COMPAT_PINS = ['nvidia-cudnn-cu12==9.20.0.48', 'nvidia-cublas-cu12==12.9.1.4'] as const;
+export const ROCM_TORCH_INDEX = 'https://download.pytorch.org/whl/rocm7.1';
 export const ROCM_TORCH_PINS = [
-  'torch==2.8.0',
-  'torchaudio==2.8.0',
-  'torchvision==0.23.0',
+  'torch==2.13.0',
+  'torchaudio==2.11.0',
+  'torchvision==0.28.0',
 ] as const;
 /**
  * Whether this OS can have the ROCm torch stack at all.
  *
  * PyTorch's ROCm index (`ROCM_TORCH_INDEX`) publishes Linux wheels only. On
- * Windows `uv pip install --index-url <rocm6.4> torch==2.8.0` finds nothing and
+ * Windows `uv pip install --index-url <rocm7.1> torch==2.13.0` finds nothing and
  * the whole runtime bootstrap fails, leaving the app unusable instead of merely
  * CPU-bound - so the opt-in is ignored there and the host resolves like any
  * other (Settings > Performance explains which engines can still use a Radeon).
@@ -55,7 +55,7 @@ export function rocmTorchOptIn(platform: NodeJS.Platform = process.platform): bo
 }
 /**
  * CPU-only PyTorch for hosts without an NVIDIA driver. The lock pins the
- * `+cu128` build on Linux/Windows x64, whose wheels (plus ~15 `nvidia-*`
+ * `+cu130` build on Linux/Windows x64, whose wheels (plus ~15 `nvidia-*`
  * packages on Linux) are several GB a CPU-only machine can never use. These
  * pins mirror `backend/services/sidecar_install.py::_torch_pin_args` and are
  * kept equal to the `torch==` constraints in pyproject.toml by
@@ -63,9 +63,9 @@ export function rocmTorchOptIn(platform: NodeJS.Platform = process.platform): bo
  */
 export const CPU_TORCH_INDEX = 'https://download.pytorch.org/whl/cpu';
 export const CPU_TORCH_PINS = [
-  'torch==2.8.0+cpu',
-  'torchaudio==2.8.0+cpu',
-  'torchvision==0.23.0+cpu',
+  'torch==2.13.0+cpu',
+  'torchaudio==2.11.0+cpu',
+  'torchvision==0.28.0+cpu',
 ] as const;
 export const CPU_TORCH_ARGS = [
   '--extra-index-url',
@@ -79,7 +79,7 @@ export const RUNTIME_REPAIR_PACKAGES = ['torch', 'torchaudio', 'torchvision'] as
 export const RUNTIME_NATIVE_IMPORT_PROBE = 'import torch, torchaudio, torchvision';
 export const RUNTIME_IMPORT_PROBE =
   'import fastapi, uvicorn, omnivoice, faster_whisper, sentencepiece, torch, torchaudio, torchvision';
-const RUNTIME_SCHEMA = 'electron-runtime-v2-cudnn8';
+const RUNTIME_SCHEMA = 'electron-runtime-v3-torch213-cuda12';
 const CUDNN8_PROBE_PREFIX = 'VOICESTUDIO_CUDNN8_PROBE=';
 const REQUIRED_ENV_BYTES = 9 * 1024 ** 3;
 // No CUDA wheels: torch itself is ~0.2 GB; the rest is ordinary dependencies plus
@@ -156,7 +156,7 @@ export interface TorchChoice {
 /** Linux/Windows x64 (and Windows on ARM, via emulation) are where the lock selects CUDA wheels. */
 function cpuTorchApplies(platform: NodeJS.Platform, arch: string): boolean {
   return (
-    (platform === 'linux' && arch === 'x64') ||
+    (platform === 'linux' && (arch === 'x64' || arch === 'arm64')) ||
     (platform === 'win32' && (arch === 'x64' || arch === 'arm64'))
   );
 }
@@ -258,11 +258,13 @@ function parseCudnn8Probe(output: string | void): Cudnn8Probe | null {
 async function hasCudnn8Libraries(compatDir: string): Promise<boolean> {
   const libDir = join(compatDir, 'nvidia', 'cudnn', process.platform === 'win32' ? 'bin' : 'lib');
   const names = await readdir(libDir).catch(() => [] as string[]);
+  const blasNames = await readdir(join(compatDir, 'nvidia', 'cublas', process.platform === 'win32' ? 'bin' : 'lib')).catch(() => [] as string[]);
+  const blas = process.platform === 'win32' ? ['cublas64_12.dll', 'cublasLt64_12.dll'] : ['libcublas.so.12', 'libcublasLt.so.12'];
   return (
-    names.filter((name) =>
+    blas.every((name) => blasNames.includes(name)) && names.filter((name) =>
       process.platform === 'win32'
-        ? name.startsWith('cudnn') && name.endsWith('64_8.dll')
-        : name.startsWith('libcudnn') && name.endsWith('.so.8'),
+        ? name.startsWith('cudnn') && name.endsWith('64_9.dll')
+        : name.startsWith('libcudnn') && name.endsWith('.so.9'),
     ).length >= 5
   );
 }
@@ -292,11 +294,11 @@ async function ensureCudnn8Compat(
   await clearCtranslate2ExecutableStack(probe.sitePackages);
   signal.throwIfAborted();
   if (probe.device !== 'cuda') return;
-  const compatDir = join(probe.sitePackages, 'cudnn8_compat');
+  const compatDir = join(probe.sitePackages, 'ctranslate2_cuda12');
   if (await hasCudnn8Libraries(compatDir)) return;
   await run(
     uv,
-    ['pip', 'install', '--no-deps', '--target', compatDir, '--python', python, CUDNN8_COMPAT_PIN],
+    ['pip', 'install', '--no-deps', '--target', compatDir, '--python', python, ...CUDNN_COMPAT_PINS],
     project,
     env,
   );

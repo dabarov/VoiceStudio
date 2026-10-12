@@ -495,3 +495,8 @@ def test_classic_generate_unaffected_by_stream_default(client, monkeypatch,
     assert res.status_code == 200, res.text
     assert res.headers.get("content-type") == "audio/wav"
     assert res.headers.get("x-audio-id")
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

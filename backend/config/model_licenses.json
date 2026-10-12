@@ -2834,9 +2834,9 @@
       ],
       "configured_at": "backend/services/tts_backend.py OMNIVOICE_MOSS_TTS_MODEL",
       "notes": "Licence label is upstream metadata only; governing component terms, author credit and required notices remain under review.",
-      "runtime_revision": null,
-      "runtime_pin_scope": "external",
-      "runtime_pin_source": null,
+      "runtime_revision": "44502f80dbf9743528fa921cc544d662c685ebec",
+      "runtime_pin_scope": "engine",
+      "runtime_pin_source": "backend/engines/moss_sources.py",
       "component_closure": "incomplete",
       "commercial_inference": "unknown",
       "commercial_outputs": "unknown",
@@ -2903,6 +2903,56 @@
         ],
         "identified_components": []
       }
+    },
+    {
+      "id": "OpenMOSS-Team/MOSS-Audio-Tokenizer",
+      "license": "NOASSERTION",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "OpenMOSS-Team/MOSS-Audio-Tokenizer",
+      "source_url": "https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer",
+      "evidence_url": "https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer/tree/3cd226ba2947efa357ef453bcad111b6eafba782",
+      "revision": "3cd226ba2947efa357ef453bcad111b6eafba782",
+      "engines": [
+        "moss-tts-v15"
+      ],
+      "configured_at": "backend/engines/moss_sources.py",
+      "notes": "Pinned executable codec dependency. Licence and component terms remain unreviewed; this security pin is not commercial clearance.",
+      "runtime_revision": "3cd226ba2947efa357ef453bcad111b6eafba782",
+      "runtime_pin_scope": "engine",
+      "runtime_pin_source": "backend/engines/moss_sources.py",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "unknown"
+    },
+    {
+      "id": "OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano",
+      "license": "NOASSERTION",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano",
+      "source_url": "https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano",
+      "evidence_url": "https://huggingface.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano/tree/6aa02b01e445cc585582cf0ba480bc3ea6c8dd68",
+      "revision": "6aa02b01e445cc585582cf0ba480bc3ea6c8dd68",
+      "engines": [
+        "moss-tts-nano"
+      ],
+      "configured_at": "backend/engines/moss_sources.py",
+      "notes": "Pinned executable codec dependency. Licence and component terms remain unreviewed; this security pin is not commercial clearance.",
+      "runtime_revision": "6aa02b01e445cc585582cf0ba480bc3ea6c8dd68",
+      "runtime_pin_scope": "engine",
+      "runtime_pin_source": "backend/engines/moss_sources.py",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "unknown"
     }
   ],
   "dynamic_assets": [

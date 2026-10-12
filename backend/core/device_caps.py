@@ -57,7 +57,7 @@ DIRECTML_MARKER = "DirectML device present"
 # their machine simply has no GPU.
 UNUSABLE_GPU_MARKER = "present but PyTorch cannot use it"
 
-# NOTE: the NVIDIA driver-version check (CUDA 12.x minor-compat floor: R525.60.13 Linux / R528.33 Windows)
+# NOTE: the NVIDIA driver-version check (CUDA 13.x minor-compat floor: R580 on Linux and Windows)
 # is intentionally NOT done here — it requires shelling to ``nvidia-smi``, which
 # would put a subprocess on the cold-start probe path. That check stays in
 # ``wizard._detect_gpu`` (preflight), which already runs it. The probe only

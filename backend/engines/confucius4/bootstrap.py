@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from engines._venv_probe import ProbeResult, log_safe, venv_can_import
+from engines.native_compat import bootstrap_args as native_install_args
 
 logger = logging.getLogger("omnivoice.confucius4.bootstrap")
 
@@ -217,7 +218,7 @@ def _bootstrap_engines_venv(clone_dir: Path) -> Path:
         if requirements.is_file():
             subprocess.run(
                 [uv, "pip", "install", "--python", str(python_path),
-                 "-r", str(requirements)],
+                 "-r", str(requirements), *native_install_args("confucius4-tts")],
                 check=True, timeout=_UV_PIP_INSTALL_TIMEOUT_S, capture_output=True,
                 env=_uv_env(),
             )
@@ -226,7 +227,7 @@ def _bootstrap_engines_venv(clone_dir: Path) -> Path:
         # fails outright. Import resolution is handled via sys.path instead.
         if (clone_dir / "pyproject.toml").is_file() or (clone_dir / "setup.py").is_file():
             subprocess.run(
-                [uv, "pip", "install", "--python", str(python_path), "-e", str(clone_dir)],
+                [uv, "pip", "install", "--python", str(python_path), "-e", str(clone_dir), *native_install_args("confucius4-tts")],
                 check=True, timeout=_UV_PIP_INSTALL_TIMEOUT_S, capture_output=True,
                 env=_uv_env(),
             )

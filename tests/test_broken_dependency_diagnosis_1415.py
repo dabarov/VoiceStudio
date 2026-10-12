@@ -276,3 +276,8 @@ def test_the_fallback_detail_does_not_leak_a_path(mm, monkeypatch):
     assert secret not in error
     assert "somebody" not in error
     assert "Logs" in error
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

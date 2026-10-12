@@ -49,9 +49,9 @@ def test_rocm_reinstall_targets_this_venv_with_pinned_stack():
         "https://idx/",
     ]
     assert setup.ROCM_TORCH_PINS == (
-        "torch==2.8.0",
-        "torchaudio==2.8.0",
-        "torchvision==0.23.0",
+        "torch==2.13.0",
+        "torchaudio==2.11.0",
+        "torchvision==0.28.0",
     )
 
 

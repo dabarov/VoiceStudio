@@ -2111,13 +2111,14 @@ class MossTTSNanoBackend(TTSBackend):
         from engines.moss_sources import nano_source, snapshot_path
 
         checkpoint, revision = nano_source()
+        checkpoint_path = snapshot_path(checkpoint, revision)
         codec_repo, codec_revision = nano_source(codec=True)
         codec_path = snapshot_path(codec_repo, codec_revision)
         logger.info("Loading MOSS-TTS-Nano from %s", checkpoint)
         self._model = _retry_once_with_fresh_hf_client(
             lambda: model_cls.from_pretrained(
-                checkpoint, revision=revision, code_revision=revision,
-                trust_remote_code=True, use_safetensors=True,
+                checkpoint_path, revision=revision, code_revision=revision,
+                trust_remote_code=True, use_safetensors=True, local_files_only=True,
                 audio_tokenizer_pretrained_name_or_path=codec_path,
             ),
             "MOSS-TTS-Nano",

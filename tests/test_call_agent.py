@@ -726,7 +726,9 @@ def test_barge_in_clears_playback_and_hangup_ends_the_call(api, gw, fakes):
         while not (msg["event"] == "mark" and msg["mark"]["name"] == M.session.END_MARK):
             msg = _recv(ws)
         _echo(ws, M.session.END_MARK)
-    rec = _wait_record(api, call_id, lambda r: r["ended_at"] is not None and r["status"] == "completed")
+        # Let the server consume the final acknowledgement before TestClient
+        # cancels the websocket session on context exit (Starlette >=1.3).
+        rec = _wait_record(api, call_id, lambda r: r["ended_at"] is not None and r["status"] == "completed")
     assert rec["outcome"] == "not_done"
 
 

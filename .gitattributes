@@ -1,3 +1,6 @@
 # Hash-pinned legal texts (tests/test_cla_workflow.py): identical bytes on every OS.
 .github/CLA-*.md text eol=lf
 .github/CCLA-*.md text eol=lf
+
+# Preserve the exact upstream licence bytes used by the verified audio adapter.
+vendor/python/audio_compat/voicestudio_audio_compat/LICENSE whitespace=-blank-at-eol

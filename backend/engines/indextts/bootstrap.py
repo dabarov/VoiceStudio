@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Optional
 
 from engines._venv_probe import ProbeResult, log_safe, venv_can_import
+from engines.native_compat import bootstrap_args as native_install_args
 
 logger = logging.getLogger("omnivoice.indextts.bootstrap")
 
@@ -270,7 +271,7 @@ def _bootstrap_engines_venv(indextts_clone: Path) -> Path:
             [
                 uv, "pip", "install",
                 "--python", str(python_path),
-                "-e", str(indextts_clone),
+                "-e", str(indextts_clone), *native_install_args("indextts2"),
             ],
             check=True,
             timeout=_UV_PIP_INSTALL_TIMEOUT_S,

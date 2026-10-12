@@ -1,0 +1,56 @@
+[
+  {
+    "path": "wheels/accelerate-1.14.0+voicestudio.1-py3-none-any.whl",
+    "name": "accelerate",
+    "version": "1.14.0+voicestudio.1",
+    "sha256": "abf4066fdf940800f68b154e74dd39be7850965e44c71a816884ef19c07165d3"
+  },
+  {
+    "path": "wheels/nltk-3.10.3+voicestudio.1-py3-none-any.whl",
+    "name": "nltk",
+    "version": "3.10.3+voicestudio.1",
+    "sha256": "76cc498456de749df2af4899e674a432adfeb27898ab755cdfc5c1b1983a8867"
+  },
+  {
+    "path": "wheels/pyannote_audio-3.4.0+voicestudio.1-py3-none-any.whl",
+    "name": "pyannote.audio",
+    "version": "3.4.0+voicestudio.1",
+    "sha256": "1b02739a8110a7868920fdd19246b98937a391256f18710b731b787f20fe59a1"
+  },
+  {
+    "path": "wheels/stanza-1.10.1+voicestudio.1-py3-none-any.whl",
+    "name": "stanza",
+    "version": "1.10.1+voicestudio.1",
+    "sha256": "7ff0a8d9ea3f5da5b4a68c2a61e9bd92dc75f6b1b6189f90e5981740642da98f"
+  },
+  {
+    "path": "wheels/transformers-4.52.4+voicestudio.1-py3-none-any.whl",
+    "name": "transformers",
+    "version": "4.52.4+voicestudio.1",
+    "sha256": "0cf0016da3be7754a68c86691f54d90418615a5a0af9ce64a23d5af26cb0f53a"
+  },
+  {
+    "path": "wheels/transformers-4.57.6+voicestudio.1-py3-none-any.whl",
+    "name": "transformers",
+    "version": "4.57.6+voicestudio.1",
+    "sha256": "6a852ec6f3455be5845a5fed9a066856962cf62ee02b744b2d1c2d9a9ddafe80"
+  },
+  {
+    "path": "wheels/transformers-5.0.0+voicestudio.1-py3-none-any.whl",
+    "name": "transformers",
+    "version": "5.0.0+voicestudio.1",
+    "sha256": "7839bb37b17bd939c6b693d37ef7b0b4b836614e923d193c525f4df1ac67f054"
+  },
+  {
+    "path": "wheels/voicestudio_audio_compat-0.1.0-py3-none-any.whl",
+    "name": "voicestudio-audio-compat",
+    "version": "0.1.0",
+    "sha256": "c334c2b7de2b150c13310d2a9603498105003ec951341f5bfca21b4cc9a2660a"
+  },
+  {
+    "path": "wheels/whisperx-3.7.4+voicestudio.1-py3-none-any.whl",
+    "name": "whisperx",
+    "version": "3.7.4+voicestudio.1",
+    "sha256": "d5cbed3cdecb3e893fa9b132aba863825e1d3c6f46672e87a8c2ac15a54580dd"
+  }
+]

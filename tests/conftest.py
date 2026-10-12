@@ -706,3 +706,16 @@ def symlink_or_skip():
             pytest.skip(f"symlinks unavailable in this environment: {exc}")
 
     return _make
+
+
+@pytest.fixture
+def in_process_omnivoice_host(monkeypatch):
+    """Model mocks in legacy unit tests target the resident CPU engine.
+
+    Set that host explicitly so running these tests on an MPS laptop does
+    not bypass their model mocks and spawn a real model worker. Dedicated
+    MPS routing tests keep exercising the real platform selection.
+    """
+    from core import device_caps
+    monkeypatch.setattr(device_caps, "detect_host_caps",
+                        lambda: device_caps.HostCaps("cpu", ("cpu",)))

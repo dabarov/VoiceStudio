@@ -656,6 +656,8 @@ def _phase_a_build_inner() -> None:
         pass
 
     _startup_progress.begin_step("ml_imports")
+    from voicestudio_audio_compat import activate
+    activate()
     import torchaudio
     warnings.filterwarnings("ignore", category=UserWarning)
     # torchaudio 2.9 REMOVED set_audio_backend(); soundfile has been the only

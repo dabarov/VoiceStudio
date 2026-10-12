@@ -7,7 +7,7 @@
    (especially debloated/LTSC-style) don't ship it. We detect and auto-install
    it silently before any `import torch` can fail.
 
-2. **CUDA: cuDNN 8 compat** — Ensures cuDNN 8 libraries are available for
+2. **CUDA: cuDNN 9 / cuBLAS 12 compat** — Ensures cuDNN 9 / cuBLAS 12 libraries are available for
    CTranslate2 (faster-whisper / WhisperX) alongside PyTorch 2.8+'s cuDNN 9.
 
 3. **AMD ROCm torch (opt-in)** — with `OMNIVOICE_TORCH_VARIANT=rocm` set,
@@ -19,8 +19,8 @@
 Run automatically as part of `bun run setup:api` — no user action required.
 
 Cross-platform:
-  - Linux:   cuDNN 8 compat (.so.8 libs)
-  - Windows: VC++ Redistributable + cuDNN 8 compat (.dll libs)
+  - Linux:   cuDNN 9 / cuBLAS 12 compat (.so.9 libs)
+  - Windows: VC++ Redistributable + cuDNN 9 / cuBLAS 12 compat (.dll libs)
   - macOS:   skipped (no CUDA)
 """
 import os
@@ -48,8 +48,8 @@ for _stream in (sys.stdout, sys.stderr):
 
 # Keep in sync with Electron's runtime-project.ts and
 # [tool.uv.constraint-dependencies].
-ROCM_TORCH_INDEX = "https://download.pytorch.org/whl/rocm6.4"
-ROCM_TORCH_PINS = ("torch==2.8.0", "torchaudio==2.8.0", "torchvision==0.23.0")
+ROCM_TORCH_INDEX = "https://download.pytorch.org/whl/rocm7.1"
+ROCM_TORCH_PINS = ("torch==2.13.0", "torchaudio==2.11.0", "torchvision==0.28.0")
 
 
 def _rocm_opt_in(environ=os.environ):
@@ -164,10 +164,10 @@ def _ensure_vcredist_windows():
             pass
 
 
-# ── cuDNN 8 compat ────────────────────────────────────────────────────────
+# ── cuDNN 9 / cuBLAS 12 compat ────────────────────────────────────────────────────────
 
 def _find_compat_dir():
-    """Return the cudnn8_compat target directory, auto-detecting venv layout."""
+    """Return the ctranslate2_cuda12 target directory, auto-detecting venv layout."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     venv_dir = os.path.join(project_root, ".venv")
@@ -177,11 +177,11 @@ def _find_compat_dir():
 
     if sys.platform == "win32":
         # Windows: .venv/Lib/site-packages/
-        sp = os.path.join(venv_dir, "Lib", "site-packages", "cudnn8_compat")
+        sp = os.path.join(venv_dir, "Lib", "site-packages", "ctranslate2_cuda12")
     else:
         # Linux: .venv/lib/pythonX.Y/site-packages/
         pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
-        sp = os.path.join(venv_dir, "lib", pyver, "site-packages", "cudnn8_compat")
+        sp = os.path.join(venv_dir, "lib", pyver, "site-packages", "ctranslate2_cuda12")
 
     return sp
 
@@ -194,11 +194,17 @@ def _cudnn8_lib_dir(compat_dir):
 
 
 def _count_cudnn8_libs(lib_dir):
-    """Count cuDNN 8 shared libraries in the given directory."""
+    """Count cuDNN 9 / cuBLAS 12 shared libraries in the given directory."""
     if sys.platform == "win32":
-        return len(glob.glob(os.path.join(lib_dir, "cudnn*64_8.dll")))
-    return len(glob.glob(os.path.join(lib_dir, "libcudnn*.so.8")))
+        return len(glob.glob(os.path.join(lib_dir, "cudnn*64_9.dll")))
+    return len(glob.glob(os.path.join(lib_dir, "libcudnn*.so.9")))
 
+
+
+def _blas_libs_ready(compat_dir):
+    tail = "bin" if sys.platform == "win32" else "lib"
+    names = ("cublas64_12.dll", "cublasLt64_12.dll") if sys.platform == "win32" else ("libcublas.so.12", "libcublasLt.so.12")
+    return all(os.path.isfile(os.path.join(compat_dir, "nvidia", "cublas", tail, name)) for name in names)
 
 def main():
     # ── Step 1: Windows VC++ Redistributable ──────────────────────────────
@@ -221,8 +227,8 @@ def main():
     # Already installed?
     if os.path.isdir(lib_dir):
         n = _count_cudnn8_libs(lib_dir)
-        if n >= 5:
-            print(f"✓ cuDNN 8 compat: {n} libraries ready")
+        if n >= 5 and _blas_libs_ready(compat_dir):
+            print(f"✓ cuDNN 9 / cuBLAS 12 compat: {n} libraries ready")
             return
 
     # Check if CUDA is available before installing GPU-only libs
@@ -232,13 +238,13 @@ def main():
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode != 0 or result.stdout.strip() != "True":
-            print("✓ No CUDA — cuDNN 8 compat not needed")
+            print("✓ No CUDA — cuDNN 9 / cuBLAS 12 compat not needed")
             return
     except Exception:
-        print("⚠ CUDA probe failed — skipping optional cuDNN 8 compatibility libraries")
+        print("⚠ CUDA probe failed — skipping optional cuDNN 9 / cuBLAS 12 compatibility libraries")
         return
 
-    print("⚙ Installing cuDNN 8 compatibility libraries for CTranslate2...")
+    print("⚙ Installing cuDNN 9 / cuBLAS 12 compatibility libraries for CTranslate2...")
     try:
         # `uv venv` doesn't seed pip into the venv, so `sys.executable -m pip`
         # fails with "No module named pip". `uv pip install --python` talks to
@@ -248,7 +254,8 @@ def main():
                 "uv", "pip", "install",
                 "--no-deps", "--target", compat_dir,
                 "--python", sys.executable,
-                "nvidia-cudnn-cu12==8.9.7.29",
+                "nvidia-cudnn-cu12==9.20.0.48",
+                "nvidia-cublas-cu12==12.9.1.4",
             ],
             check=True,
             capture_output=True,
@@ -256,12 +263,14 @@ def main():
             timeout=180,
         )
         n = _count_cudnn8_libs(lib_dir)
-        print(f"✓ cuDNN 8 installed: {n} libraries")
+        if n < 5 or not _blas_libs_ready(compat_dir):
+            raise RuntimeError("Incomplete cuDNN 9 / cuBLAS 12 compatibility libraries")
+        print(f"✓ cuDNN 9 / cuBLAS 12 installed: {n} libraries")
     except subprocess.CalledProcessError as e:
-        print(f"⚠ cuDNN 8 install failed (transcription may not work on CUDA):")
+        print(f"⚠ cuDNN 9 / cuBLAS 12 install failed (transcription may not work on CUDA):")
         print(f"  {(e.stderr or '')[:300]}")
     except Exception as e:
-        print(f"⚠ cuDNN 8 install skipped: {e}")
+        print(f"⚠ cuDNN 9 / cuBLAS 12 install skipped: {e}")
 
 
 if __name__ == "__main__":

@@ -60,8 +60,11 @@ def replace_once(text, old, new):
     return text.replace(old, new)
 
 
-def backport(name, files):
-    if name == "accelerate":
+def backport(name, files, version=None):
+    if name == "transformers":
+        from transformers_backport import patch
+        patch(files, version)
+    elif name == "accelerate":
         path = "accelerate/utils/modeling.py"
         source = files[path].decode()
         source = replace_once(source, "def load_checkpoint_in_model(", SHARD_GUARD + "def load_checkpoint_in_model(")
@@ -118,6 +121,29 @@ def backport(name, files):
             source = replace_once(source, f'with open(f"{{tab_dir}}/{file}", "w") as f:',
                 f'with pathsec.open(f"{{tab_dir}}/{file}", "w") as f:')
         files[path] = source.encode()
+    elif name == "pyannote_audio":
+        # Keep the 3.x model/pipeline contract while moving its audio I/O off
+        # APIs removed in TorchAudio 2.9. Tensor operations remain native.
+        for path in ("pyannote/audio/core/io.py", "pyannote/audio/utils/protocol.py"):
+            files[path] = replace_once(files[path].decode(), "import torchaudio\n",
+                "from voicestudio_audio_compat import adapter as torchaudio\n").encode()
+        path = "pyannote/audio/tasks/segmentation/mixins.py"
+        files[path] = replace_once(files[path].decode(), "from torchaudio import AudioMetaData",
+            "from voicestudio_audio_compat.common import AudioMetaData").encode()
+    elif name == "whisperx":
+        path = "whisperx-3.7.4.dist-info/METADATA"
+        source = files[path].decode()
+        for old, new in (
+            ("Requires-Dist: torch~=2.8.0", "Requires-Dist: torch>=2.13"),
+            ("Requires-Dist: torchaudio~=2.8.0", "Requires-Dist: torchaudio>=2.11"),
+            ('Requires-Dist: numpy<2.1.0,>=2.0.2;', 'Requires-Dist: numpy<2.3.0,>=2.0.2;'),
+            ("Requires-Dist: av<16.0.0", "Requires-Dist: av>=14"),
+            # WhisperX never imports Triton directly. CUDA torch supplies its
+            # matched compiler; CPU installs must not pull this GPU compiler.
+            ('Requires-Dist: triton>=3.3.0; sys_platform == "linux" and platform_machine == "x86_64"\n', ''),
+        ):
+            source = replace_once(source, old, new)
+        files[path] = source.encode()
     else:
         raise ValueError(name)
 
@@ -130,15 +156,19 @@ def build(spec):
     wheel = zipfile.ZipFile(io.BytesIO(archive))
     files = {name: wheel.read(name) for name in wheel.namelist() if not name.endswith("/")}
     name, version = spec["name"], spec["version"]
-    backport(name, files)
+    backport(name, files, version)
     new_version = version + SUFFIX
     old_info, new_info = f"{name}-{version}.dist-info/", f"{name}-{new_version}.dist-info/"
     metadata = old_info + "METADATA"
     files[metadata] = replace_once(files[metadata].decode(), f"\nVersion: {version}\n", f"\nVersion: {new_version}\n").encode()
+    if name == "pyannote_audio":
+        files[metadata] = files[metadata].replace(b"\n\n",
+            b"\nRequires-Dist: voicestudio-audio-compat==0.1.0\n\n", 1)
     files = {key.replace(old_info, new_info): value for key, value in files.items()
              if key != old_info + "RECORD"}
     # The upstream source's public version must match distribution metadata.
-    for key in (f"{name}/__init__.py", f"{name}/_version.py"):
+    package = "pyannote/audio" if name == "pyannote_audio" else name
+    for key in (f"{package}/__init__.py", f"{package}/_version.py", f"{package}/version.py"):
         if key in files:
             files[key] = files[key].replace(f'__version__ = "{version}"'.encode(), f'__version__ = "{new_version}"'.encode())
     if f"{name}/VERSION" in files:
@@ -166,3 +196,5 @@ def build(spec):
 if __name__ == "__main__":
     for source in json.loads((ROOT / "sources.json").read_text()):
         build(source)
+    from wheel_manifest import write
+    write()

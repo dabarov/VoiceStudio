@@ -35,7 +35,7 @@ gives CosyVoice its own folder under the data directory and its own Python
 
 It differs from upstream's own setup:
 
-- **PyTorch 2.7.0.** The CUDA 12.8 build on an NVIDIA GPU, the CPU build on
+- **PyTorch 2.13.0 with TorchAudio 2.11.0.** The CUDA 13.0 build on an NVIDIA GPU, the CPU build on
   other Windows and Linux machines, the regular build on Apple Silicon.
   Upstream's 2.3.1 exists only for CUDA 12.1 and cannot run on RTX 50-series
   GPUs.
@@ -46,8 +46,8 @@ It differs from upstream's own setup:
   distribution’s C++ build tools on Linux. SoX is not needed.
 - **Patched dependencies.** Where upstream pins a release with a published
   security advisory (diffusers, hydra-core, lightning, modelscope, onnx,
-  protobuf, transformers), the install uses the fixed release. That set was
-  installed on Windows and passes the install's import check.
+  protobuf, transformers), the install uses the fixed release. The fork adds a legacy audio I/O adapter; the original Windows validation
+  does not certify this updated runtime. See [fork validation](../fork-security.md).
 - **No text normaliser.** Upstream's (wetext) downloads its data from
   ModelScope on every model load, and ModelScope rate-limits those
   downloads, so a normaliser could half-download and fail silently. The

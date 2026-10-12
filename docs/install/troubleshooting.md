@@ -178,7 +178,7 @@ unpinned reinstall can itself resolve a drifted pair
 ([#1357](https://github.com/debpalash/VoiceStudio/issues/1357)):
 
 ```
-uv pip install --python .venv --reinstall torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 transformers
+uv pip install --python .venv --reinstall torch==2.13.0 torchaudio==2.11.0 torchvision==0.28.0 transformers
 ```
 
 run in the project folder. The versions mirror `deploy/torch-constraints.txt`

@@ -243,3 +243,8 @@ def test_generate_respects_applies_own_mastering(client, monkeypatch, no_omnivoi
     res = client.post("/generate", data={"text": "plain", "engine": "fake-plain"})
     assert res.status_code == 200, res.text
     assert mastering.call_count == 1
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

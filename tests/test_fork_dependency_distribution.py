@@ -12,13 +12,28 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_optional_engine_wheel_manifest_covers_shipped_files():
+    folder = ROOT / "vendor/python"
+    manifest = json.loads((folder / "wheel-manifest.json").read_text())
+    assert {row["path"] for row in manifest} == {str(p.relative_to(folder)) for p in (folder / "wheels").glob("*.whl")}
+    for row in manifest:
+        assert hashlib.sha256((folder / row["path"]).read_bytes()).hexdigest() == row["sha256"]
+        with zipfile.ZipFile(folder / row["path"]) as wheel:
+            record = next(n for n in wheel.namelist() if n.endswith(".dist-info/RECORD"))
+            for name, digest, size in csv.reader(io.StringIO(wheel.read(record).decode())):
+                if digest:
+                    data = wheel.read(name)
+                    assert len(data) == int(size)
+                    assert digest == "sha256=" + base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+
+
 def test_locked_backports_have_valid_wheel_records_and_no_unsafe_stanza_loads():
     config = tomllib.loads((ROOT / "pyproject.toml").read_text())
     lock = tomllib.loads((ROOT / "uv.lock").read_text())
-    for name in ("accelerate", "stanza", "nltk"):
+    for name in ("accelerate", "stanza", "nltk", "pyannote-audio", "whisperx", "voicestudio-audio-compat"):
         source = config["tool"]["uv"]["sources"][name]["path"]
         package = next(p for p in lock["package"] if p["name"] == name)
-        assert package["version"].endswith("+voicestudio.1")
+        assert package["version"].endswith("+voicestudio.1") or (name == "voicestudio-audio-compat" and package["version"] == "0.1.0")
         assert package["source"]["path"] == source
         assert package["wheels"][0]["hash"] == "sha256:" + hashlib.sha256((ROOT / source).read_bytes()).hexdigest()
         with zipfile.ZipFile(ROOT / source) as wheel:

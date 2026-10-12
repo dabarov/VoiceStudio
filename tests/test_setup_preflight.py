@@ -229,15 +229,17 @@ def test_preflight_nvidia_driver_below_min_flags_fail():
     "platform_, driver, flagged",
     [
         ("linux", "524.99", True),
-        ("linux", "525.60.13", False),
-        ("linux", "550.54.14", False),
-        ("win32", "527.56", True),   # 527 < 528.33 Windows floor (#2489)
-        ("win32", "528.33", False),
-        ("win32", "551.23", False),
+        ("linux", "525.60.13", True),
+        ("linux", "550.54.14", True),
+        ("linux", "580.65.06", False),
+        ("win32", "527.56", True),
+        ("win32", "528.33", True),
+        ("win32", "551.23", True),
+        ("win32", "580.88", False),
     ],
 )
-def test_nvidia_driver_floor_is_cuda12_minor_compat(monkeypatch, platform_, driver, flagged):
-    """525 (Linux) / 528.33 (Windows) is enough for the bundled CUDA 12.8 runtime."""
+def test_nvidia_driver_floor_is_cuda13_minor_compat(monkeypatch, platform_, driver, flagged):
+    """The patched CUDA 13 runtime requires R580 or newer on both OSes."""
     from api.routers.setup import wizard as setup_mod
 
     monkeypatch.setattr(
@@ -251,9 +253,7 @@ def test_nvidia_driver_floor_is_cuda12_minor_compat(monkeypatch, platform_, driv
         return -1, ""
 
     monkeypatch.setattr(setup_mod, "_run_cmd", fake_run_cmd)
-    import platform as _p
-    if sys.platform == "darwin" and _p.machine() == "arm64":
-        pytest.skip("apple-silicon branch returns before nvidia-smi")
+    monkeypatch.setattr(setup_mod._platform, "machine", lambda: "x86_64")
     info = setup_mod._detect_gpu()
     assert info["vendor"] == "nvidia"
     assert any("driver" in n.lower() for n in info["notes"]) is flagged

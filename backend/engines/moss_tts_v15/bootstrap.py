@@ -16,9 +16,8 @@ Probe order (priority — existing power-user installs win, zero migration):
        created by step 3 if needed.
     3. Bootstrap: ``uv venv`` then ``uv pip install -e
        "${DIR}[torch-runtime]"``. Requires ``OMNIVOICE_MOSS_TTS_V15_DIR``.
-       The upstream ``torch-runtime`` extra is CUDA (``+cu128``), so the
-       auto-bootstrap targets CUDA hosts; non-CUDA (CPU/Mac) users set up
-       their own venv per docs/engines/moss-tts-v15.md (Probe 1).
+       Shared native overrides replace upstream CUDA-only pins with the
+       patched stack. The host selects CPU, CUDA or native macOS wheels.
 
 Caching: resolution is memoised after the first successful call. Tests
 reset via :func:`invalidate`.
@@ -39,6 +38,7 @@ from pathlib import Path
 from typing import Optional
 
 from engines._venv_probe import ProbeResult, log_safe, venv_can_import
+from engines.native_compat import bootstrap_args as native_install_args
 
 logger = logging.getLogger("omnivoice.moss_tts_v15.bootstrap")
 
@@ -253,8 +253,6 @@ def _bootstrap_engines_venv(clone_dir: Path) -> Path:
             f"{exc.stderr.decode('utf-8', errors='replace') if exc.stderr else exc}"
         ) from exc
 
-    from core.torch_indexes import UV_PIP_CU128_ARGS
-
     python_path = _venv_python_path(_ENGINES_VENV_DIR)
     try:
         subprocess.run(
@@ -262,10 +260,8 @@ def _bootstrap_engines_venv(clone_dir: Path) -> Path:
                 uv, "pip", "install",
                 "--python", str(python_path),
                 "-e", f"{clone_dir}[torch-runtime]",
-                # The extra pins torch==2.9.1+cu128, which exists only on
-                # PyTorch's index — without it this could never resolve, on
-                # any host (core.torch_indexes).
-                *UV_PIP_CU128_ARGS,
+                # Override upstream CUDA-only pins and use the host index.
+                *native_install_args("moss-tts-v15"),
             ],
             check=True,
             timeout=_UV_PIP_INSTALL_TIMEOUT_S,

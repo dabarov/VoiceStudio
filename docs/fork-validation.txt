@@ -1,75 +1,74 @@
-VoiceStudio fork validation — 2026-10-12
+VoiceStudio fork validation — 2026-10-13
 
-Base: 2fb9bf23e42da002de1fab61e661066e956365f1
-Branch: security/local-hardening
+Upstream base: 2fb9bf23e42da002de1fab61e661066e956365f1
 Fork: https://github.com/dabarov/VoiceStudio
-Host: macOS, Apple Silicon
+Branch: security/local-hardening
+Review: https://github.com/dabarov/VoiceStudio/pull/1 (draft, not merged)
+Host: Apple Silicon macOS; Node 22.23.3, Bun 1.4.2, uv 0.12.13, Python 3.11.
 
-PASS
-- Added updater-policy and translation-child environment tests: both failed on
-  the base code and passed after the changes.
-- Download write-boundary regressions: the base code corrupted a completed
-  neighboring range and exceeded the known file size. Patched tests also cover
-  incremental chunks and a successful retry that preserves completed data.
-- Backend security selection: 94 passed, 2 deprecation warnings. Includes browser
-  origin/host checks, WebSocket protection, token isolation from mirrors, range
-  identity, cache pointers, resume/write bounds, and existing dependency floors.
-- Full Electron test command on Node 22.23.3: 1,450 passed / 2 skipped in the
-  main+renderer suite, and 2,896 passed in the shared suite (4,346 total passed).
-- Node frontend/script suite: 109 passed.
-- Full TypeScript type check.
-- Electron build and browser UI build.
-- Packaging contract: built entry syntax, resources and canonical version.
-- git diff --check; Python compilation of the changed download module/tests.
+TEST RESULTS
+- Full backend suite: 9,543 passed, 63 skipped, 2 expected failures,
+  7 non-strict unexpected passes, 6 subtests passed. Process exited normally.
+- Separate backend session suite: 510 passed.
+- Final installer/source/driver selection: 286 passed, 7 skipped. A subsequent
+  duplicate-option fix in the AMD installer passed 172 targeted tests; its new
+  regression failed before the fix. The full suite was already in progress
+  when this last change was made.
+- Electron/shared suites: 4,346 passed, 2 skipped. TypeScript checks passed.
+  Final CPU/ARM installer changes also passed 53 targeted tests, 2 skipped.
+- Frontend/script suite: 109 passed.
+- Native Rust helper: 33 tests passed; release helper built successfully.
+- Web/Electron production builds and packaging contract passed.
+- Python tests ran with HF_HUB_OFFLINE=1 and separate empty Hub cache paths.
+  Existing warnings include deprecated APIs and non-strict xpass markers.
 
-TEST ENVIRONMENT
-JavaScript dependencies were installed from the frozen bun.lock with lifecycle
-scripts disabled. Unit tests used ELECTRON_OVERRIDE_DIST_PATH pointing to a
-nonexistent temporary test path so importing the Electron npm shim did not
-download or start a desktop binary. Both actual frontend bundles were built.
-The existing Bun 1.3.4 installed the lock; the repository declares Bun 1.4.2.
+REAL COMPATIBILITY CHECKS
+- Native Torch 2.13.0 / TorchAudio 2.11.0 / TorchVision 0.28.0 imported.
+  Real WAV reads/writes/crops/resampling, tensor convolution and NMS passed.
+- The actual bundled WhisperX VAD checkpoint loaded and inferred on a synthetic
+  tone on CPU. No TTS voice/model weights were downloaded for these tests.
+- All eight managed Torch engine dependency sets resolved with security
+  overrides on macOS; IndexTTS's Linux CPU manifest also resolved.
+- Pinned IndexTTS 2.5 and Nano runtime imports passed. IndexTTS custom GPT-2
+  forward inference and cached decoding passed on real tensors.
+- Legacy Transformers security tests: 13 passed/2 skipped on 4.52.4;
+  14 passed/1 skipped on each of 4.57.6 and 5.0.0. The relevant attack
+  regressions failed against original upstream wheels before backporting.
+- Accelerate, Stanza, NLTK, braces and sprintf-js security regressions reproduced
+  the original failures and passed with the fixes. Local wheel hashes, RECORD
+  entries, exact retained licence bytes and packaged resources were checked.
+- Real backend start/stop smoke: /health, /sysinfo and /engines returned 200;
+  MPS was detected and shutdown exited normally.
 
-An initial full UI run on the laptop's Node 26.8.1 failed on localStorage in the
-test environment (97 failed tests). The unchanged suite passed on Node 22, the
-major version used by upstream CI. No app change was made to hide those errors.
+DEPENDENCY AUDITS
+- Main lock plus all shipped local wheels: 313 public package/version queries.
+  Remaining OSV matches are the six backported upstream versions: Accelerate,
+  Stanza, NLTK and the three legacy Transformers families. The audit deliberately
+  reports these instead of hiding advisories behind local version suffixes.
+- Eight optional engine resolutions: 300 unique package/version queries; only
+  the corresponding locally patched upstream versions matched advisories.
+- Rust lock: 346 registry packages queried after quinn-proto was updated to
+  0.11.18; no OSV matches returned. These are database results at review time,
+  not a guarantee against unknown/future vulnerabilities.
+- Fork GitHub Actions did not report remote checks; the above are local results.
 
-Python checks ran in a separate test environment with Python 3.12.11 and the
-libraries needed by these tests, not a complete uv.lock production install.
-HF_HUB_OFFLINE=1 and an empty HF_HUB_CACHE were set. Network operations and model
-loads are stubbed by the selected tests; no real model weights were downloaded.
+INSTALLATION
+- Built and installed /Applications/VoiceStudio.app (0.5.7, same canonical
+  version as upstream; automatic upstream updates disabled).
+- Locally ad-hoc signed; codesign --verify --deep --strict passed. This is not
+  Apple Developer ID signing or notarization. No system security protection
+  was disabled.
+- The app completed its normal frozen first-run runtime installation. Installed
+  metadata confirms the patched native stack, all main security backports,
+  pyannote/WhisperX compatibility wheels and the audio adapter.
 
-NOT VERIFIED
-- Full Python suite and all optional engine environments.
-- A complete frozen production installation and real voice-generation smoke test.
-- Windows/Linux execution, installer signing, notarization, and update migration.
-- Absence of all vulnerabilities or all possible prompt-injection behavior.
-
-OPEN SECURITY WORK
-The original three v0.5.6 findings are addressed by the chosen upstream source
-base. This patch adds download bounds, translation environment isolation and
-fork update isolation. Python dependency advisory matches and optional model
-code remain under review. See fork-security.md; no production installation was
-performed and this source branch must not be represented as security-certified.
-
-2026-10-13 HARDENING CHECKPOINT (native runtime upgrade still pending)
-- Bun 1.4.2, the repository's declared version, is now used. Fresh frozen install
-  with lifecycle scripts disabled succeeded, including the two local patches.
-- Electron/shared suites: 4,346 passed, 2 skipped; typecheck, both frontend
-  builds and packaging contract passed. Subsequent vendor-resource staging
-  change passed 52 targeted runtime tests, 2 skipped.
-- Frontend/script suite: 111 passed. The two dependency regressions fail before
-  the braces/sprintf-js source patches and pass afterwards.
-- Backend model pins, actual patched dependencies, wheel integrity/distribution
-  and audit lookup tests: 78 passed, 2 third-party source syntax warnings.
-- Accelerate, Stanza and NLTK regressions reproduced unsafe behavior in the
-  original libraries and passed with the backports; no real credentials used.
-- Complete root backend environment installed from uv.lock in an isolated test
-  directory (Python 3.11). This is not the production desktop installation.
-- A prior Python 3.12 frozen environment imported faster-whisper, WhisperX ASR
-  and alignment, Argos translation and pyannote with setuptools 84 successfully.
-- Optional engine environments and a patched native PyTorch stack remain under
-  compatibility testing. Every engine remains present. No security clearance,
-  signed installer, production app launch or real voice generation is claimed.
-- Repeated on the complete Python 3.11 environment: 19 actual-library,
-  distribution, audit and offline import tests passed; 91 security regression
-  tests passed. TypeScript typecheck passed after the resource-staging change.
+LIMITATIONS
+- No complete TTS synthesis across every engine, voice-cloning quality test,
+  or Windows/Linux CUDA/ROCm execution. Keeping an engine available and resolving
+  its dependencies is not equivalent to validating every model and accelerator.
+- Pins prevent unreviewed upstream code changes; downloaded Python is not a
+  sandbox. Optional translation agents still run with the user's OS privileges.
+- User-owned engine environments are not silently rewritten and retain their
+  own security status. Use the fork's managed installation/repair paths.
+- No claim of zero vulnerabilities, universal model compatibility or model
+  commercial-use clearance. Model download/access terms remain separate.

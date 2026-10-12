@@ -141,7 +141,7 @@ test("root setup command and every dev restart preserve the chosen CPU environme
   }
 });
 
-for (const platform of ["darwin", "linux"]) {
+for (const platform of ["darwin"]) {
   for (const variant of ["auto", "cpu", "cuda"]) {
     test(`${platform} ARM64 keeps native wheels with ${variant}`, async () => {
       assert.equal(
@@ -260,5 +260,12 @@ test("NVIDIA probe errors and empty GPU lists fall back to CPU", async () => {
       }),
       expected,
     );
+  }
+});
+
+
+test("Linux ARM64 uses CPU wheels without a GPU and CUDA wheels when requested", async () => {
+  for (const [variant, gpu, expected] of [["auto", false, "cpu"], ["auto", true, "cuda"], ["cpu", true, "cpu"], ["cuda", false, "cuda"]]) {
+    assert.equal(await selectTorchVariant({env: {OMNIVOICE_TORCH_VARIANT: variant}, platform: "linux", arch: "arm64", nvidiaAvailable: async () => gpu}), expected);
   }
 });

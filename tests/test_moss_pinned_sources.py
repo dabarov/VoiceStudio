@@ -15,15 +15,20 @@ def test_legacy_nano_passes_immutable_code_and_weight_revision(monkeypatch):
     factory = Mock()
     monkeypatch.setitem(sys.modules, "moss_tts_nano", SimpleNamespace(MossTTSNano=factory))
     monkeypatch.setattr(tb.MossTTSNanoBackend, "is_available", lambda self: (True, "ready"))
-    snapshot = Mock(return_value="/snapshots/pinned-nano-codec")
+    snapshot = Mock(side_effect=["/snapshots/pinned-model", "/snapshots/pinned-nano-codec"])
     monkeypatch.setattr(moss_sources, "snapshot_path", snapshot)
     # A revision must be fixed before from_pretrained is allowed to execute code.
     tb.MossTTSNanoBackend()._ensure_loaded()
     kwargs = factory.from_pretrained.call_args.kwargs
+    assert factory.from_pretrained.call_args.args[0] == "/snapshots/pinned-model"
+    assert kwargs["local_files_only"] is True
     assert kwargs["revision"] == "44502f80dbf9743528fa921cc544d662c685ebec"
     assert kwargs["code_revision"] == kwargs["revision"]
     assert kwargs["audio_tokenizer_pretrained_name_or_path"] == "/snapshots/pinned-nano-codec"
-    snapshot.assert_called_once_with(moss_sources.NANO_CODEC_REPO, moss_sources.NANO_CODEC_REVISION)
+    assert [call.args for call in snapshot.call_args_list] == [
+        (moss_sources.NANO_REPO, moss_sources.NANO_REVISION),
+        (moss_sources.NANO_CODEC_REPO, moss_sources.NANO_CODEC_REVISION),
+    ]
 
 
 def test_v15_resolves_nested_codec_at_its_own_commit(monkeypatch):

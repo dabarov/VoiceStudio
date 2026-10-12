@@ -265,7 +265,7 @@ def test_linux_arm_build_falls_back_to_cpu(
         assert "-DGGML_VULKAN=ON" not in configure_calls[-1]
 
 
-def test_cuda_sources_exclude_both_linux_arm64_spellings():
+def test_linux_arm64_has_explicit_cpu_and_cuda_sources():
     sources = tomllib.loads((REPO / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
     for package in ("torch", "torchaudio", "torchvision"):
         # Native PyPI and CPU sources can precede CUDA. Validate the named
@@ -276,11 +276,22 @@ def test_cuda_sources_exclude_both_linux_arm64_spellings():
             if source.get("index") == "pytorch-cuda"
         ]
         assert markers, f"{package} has no CUDA source"
+        cpu_markers = [
+            Marker(source["marker"])
+            for source in sources[package]
+            if source.get("index") == "pytorch-cpu" and source.get("group") == "cpu"
+        ]
+        assert cpu_markers, f"{package} has no explicit CPU source"
         for machine in ("aarch64", "arm64"):
             environment = default_environment()
             environment.update({"sys_platform": "linux", "platform_machine": machine})
-            assert not any(marker.evaluate(environment) for marker in markers), (
-                f"{package} selected CUDA on {machine}"
+            # CUDA 13 now publishes ARM64 wheels. The installer's hardware
+            # selection must still choose the CPU group on non-NVIDIA hosts.
+            assert any(marker.evaluate(environment) for marker in markers), (
+                f"{package} skipped CUDA on {machine}"
+            )
+            assert any(marker.evaluate(environment) for marker in cpu_markers), (
+                f"{package} skipped CPU on {machine}"
             )
         for system in ("linux", "win32"):
             environment = default_environment()

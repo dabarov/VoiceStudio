@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 from packaging.markers import default_environment
 from packaging.requirements import Requirement
+from packaging.utils import parse_wheel_filename
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,9 @@ def _frozen_requirements(group, tmp_path):
         env={**os.environ, "UV_CACHE_DIR": str(tmp_path / "uv"), "UV_OFFLINE": "1"},
     )
     return [
-        Requirement(line) for line in result.stdout.splitlines()
+        Requirement(f"{parse_wheel_filename(Path(line.split(';')[0].strip()).name)[0]} @ {(ROOT / line.split(';')[0].strip()).as_uri()}" + (" ; " + line.split(";", 1)[1] if ";" in line else ""))
+        if line.startswith("./") else Requirement(line)
+        for line in result.stdout.splitlines()
         if line.strip() and not line.lstrip().startswith(("#", "-"))
     ]
 
@@ -44,17 +47,17 @@ def test_frozen_torch_graph_on_supported_platforms(group, python_version, tmp_pa
                "python_full_version": f"{python_version}.1", "python_version": python_version}
         selected = {req.name: str(req.specifier) for req in requirements
                     if req.marker is None or req.marker.evaluate(env)}
-        native = platform == "darwin" or machine == "aarch64"
-        suffix = "" if native else "+cpu" if group == "cpu" else "+cu128"
-        assert selected["torch"] == f"==2.8.0{suffix}"
-        assert selected["torchaudio"] == f"==2.8.0{suffix}"
-        assert selected["torchvision"] == f"==0.23.0{suffix}"
+        native = platform == "darwin"
+        suffix = "" if native else "+cpu" if group == "cpu" else "+cu130"
+        assert selected["torch"] == f"==2.13.0{suffix}"
+        assert selected["torchaudio"] == f"==2.11.0{suffix}"
+        assert selected["torchvision"] == f"==0.28.0{suffix}"
         gpu_libs = {name for name in selected if name == "triton" or
-                    (name.startswith("nvidia-") and "-cu" in name)}
+                    (name.startswith("nvidia-") and name != "nvidia-ml-py")}
         if group == "cpu" or native:
             assert not gpu_libs, gpu_libs
         elif platform == "linux":
-            assert "nvidia-cudnn-cu12" in gpu_libs
+            assert "nvidia-cudnn-cu13" in gpu_libs
             assert "triton" in gpu_libs
 
 

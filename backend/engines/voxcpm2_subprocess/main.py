@@ -279,6 +279,15 @@ def _handle_synthesize(msg: dict, stdout) -> None:
 
 
 def main() -> int:
+    # Preserve existing user-managed environments; new managed installs supply
+    # the adapter. Its absence never changes an older working TorchAudio API.
+    try:
+        from voicestudio_audio_compat import activate
+    except ModuleNotFoundError as exc:
+        if exc.name != "voicestudio_audio_compat":
+            raise
+    else:
+        activate()
     stdin = sys.stdin.buffer
     # Frames go down a PRIVATE fd, and fd 1 is pointed at stderr (#1428): the
     # libraries this loads print to fd 1 (tqdm, native torch output), and those

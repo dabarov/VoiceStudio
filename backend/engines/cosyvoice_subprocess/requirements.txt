@@ -6,17 +6,17 @@
 # - No --extra-index-url lines. Upstream adds PyTorch's cu121 index and a
 #   third-party Azure DevOps feed for onnxruntime-gpu. The installer chooses
 #   the PyTorch build itself and uses no third-party index.
-# - torch and torchaudio are not listed here. The installer pins the 2.7.0
-#   pair per host: +cu128 on NVIDIA GPUs, +cpu on other Windows and Linux
-#   machines, the regular build on macOS. Upstream's 2.3.1 exists only for
-#   CUDA 12.1 and cannot run on RTX 50-series GPUs.
+# - torch and torchaudio are not listed here. The installer pins the patched
+#   2.13.0/2.11.0 stack per host: CUDA 13 on NVIDIA GPUs, CPU on other
+#   Windows/Linux machines, and the native Apple Silicon build on macOS.
 # - Raised past published security advisories, where upstream pins an
 #   affected release: diffusers, hydra-core, lightning, modelscope, onnx,
-#   protobuf and transformers. This exact set was installed on Windows and
-#   passes the installer's import probe (tests pin the advisory floors).
+#   protobuf and transformers. Upstream validated the earlier recipe on
+#   Windows; this fork resolves the patched recipe on macOS.
 #   transformers 5 was also checked against CosyVoice's own tokenizer (token
 #   ids identical to 4.57.6). The sidecar repairs cached attention masks and
-#   checkpoint loading precision; real CPU synthesis is also validated.
+#   checkpoint loading precision. Upstream tested CPU synthesis before
+#   the fork's native upgrade; that full synthesis still needs revalidation.
 # - Dropped: deepspeed and tensorrt-cu12* (Linux-only acceleration),
 #   onnxruntime-gpu, wetext (remote normalizer data), and unused web/training
 #   services. Keep gdown, wget and pyarrow: upstream imports them at runtime.

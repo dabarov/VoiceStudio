@@ -10,6 +10,7 @@ metadata and the backend fallback mirror it.
 
 **Highlights**
 
+- Preserve voice engines while upgrading the native runtime and adapting legacy audio APIs. (#1)
 - This security fork protects model download bounds, isolates translation environments, and disables upstream installers. (#1)
 
 ### Fixed

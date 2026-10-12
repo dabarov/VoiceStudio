@@ -173,3 +173,8 @@ def test_omnivoice_synth_pins_quality_preset_and_seed(monkeypatch):
     assert gen_calls[0]["guidance_scale"] == ab.LONGFORM_GUIDANCE_SCALE == 2.0
     # The pinned profile seed reached torch, decorrelated per chunk text.
     assert seeds == [segment_seed(42, "một đoạn văn")]
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass
