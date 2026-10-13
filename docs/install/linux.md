@@ -275,11 +275,11 @@ Ways to opt in, in order of preference:
 `OMNIVOICE_TORCH_VARIANT=rocm` set, for example
 `OMNIVOICE_TORCH_VARIANT=rocm ./VoiceStudio-Electron-*-linux-x64.AppImage`.
 Runtime setup then reinstalls `torch`/`torchaudio` from the ROCm wheel index
-(`https://download.pytorch.org/whl/rocm6.4` by default) right after the
-dependency sync, matched to the app's pinned `torch==2.8.0` (the rocm6.2 index
-only ever published up to torch 2.5.1). **Settings → Performance → GPU
-acceleration** reports which PyTorch build is installed. The option is ignored
-on macOS and Windows.
+(`https://download.pytorch.org/whl/rocm7.1` in this fork) right after the
+dependency sync, matched to PyTorch 2.13.0, TorchAudio 2.11.0 and TorchVision
+0.28.0. **Settings → Performance → GPU acceleration** reports the installed
+build. The option is ignored on macOS and Windows. This fork's GPU recipe has
+not been executed on the Apple Silicon validation laptop.
 
 **2. Source checkout.** `OMNIVOICE_TORCH_VARIANT=rocm bun run setup:api` swaps
 torch right after `uv sync`; `bun run dev` then starts the backend from that
@@ -287,27 +287,16 @@ environment, and `bun run dev:api` launches it without re-syncing, so the
 wheel is not reverted (#1665). Running `bun run setup:api` without the
 variable restores the lockfile's CUDA build — a hand-swapped ROCm wheel does
 not survive it. `OMNIVOICE_TORCH_INDEX=<url>` overrides the wheel
-index when you need a different ROCm version — e.g. AMD publishes newer
-driver-matched builds (7.2.x) at `repo.radeon.com` as a `--find-links` page
-rather than a PyPI-style index:
-```bash
-uv pip install --reinstall torch==2.8.0 torchaudio==2.8.0 \
-  --find-links https://repo.radeon.com/rocm/manylinux/rocm-rel-7.2.4/
-```
-run that manually if you want a specific ROCm point release; the
-`OMNIVOICE_TORCH_INDEX` env var only accepts a PEP 503 index URL, not a
-find-links page. If the reinstall fails (network, unsupported card), VoiceStudio
-keeps the default torch build and warns instead of breaking the install.
+index when you need another reviewed, compatible ROCm build. Keep the native
+package versions matched to this fork's constraints; upstream instructions for
+PyTorch 2.8/2.9 reintroduce the dependencies this fork replaces.
 
-**3. Manual wheel swap (fallback).** Replace torch with the ROCm wheel
-**after** the first-run install populates the venv:
+**3. Manual wheel swap (fallback).** After the first-run install, from the source
+project directory:
 
 ```bash
-# From the project directory (source install), into VoiceStudio's uv venv.
-# Matches the app's torch==2.8.0 pin — a different ROCm point release
-# (e.g. rocm6.2, rocm7.x) may not carry that exact torch build.
-uv pip install --reinstall torch torchaudio \
-  --index-url https://download.pytorch.org/whl/rocm6.4
+uv pip install --python .venv --reinstall torch==2.13.0 torchaudio==2.11.0 torchvision==0.28.0 \
+  --index-url https://download.pytorch.org/whl/rocm7.1
 ```
 
 Once a ROCm build of PyTorch is in the venv, detection is automatic —

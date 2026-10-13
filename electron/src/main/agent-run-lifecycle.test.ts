@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { EventEmitter } from 'node:events';
+import { mkdtempSync } from 'node:fs';
 import type { BackendSupervisor } from './backend';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AGENT_SCAN_TTL_MS, registerRepairAgents, REPAIR_CHANNELS } from './repair-agents';
@@ -84,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   dispose?.();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 const start = () => mock.handlers.get(REPAIR_CHANNELS.start)!(event, request);
 async function setup() {
@@ -191,6 +193,49 @@ const translation = {
   segments: [{ id: 'a', sourceText: 'Hello', start: 0, end: 1 }],
 };
 const translate = () => mock.handlers.get(REPAIR_CHANNELS.translate)!(event, translation);
+
+it('does not pass app credentials or OpenCode permission overrides to translation children', async () => {
+  for (const key of [
+    'HF_TOKEN',
+    'HUGGING_FACE_HUB_TOKEN',
+    'OMNIVOICE_API_KEY',
+    'VOICESTUDIO_LLM_AGENT_TOKEN',
+    'OPENCODE_CONFIG_CONTENT',
+    'OPENCODE_PERMISSION',
+    'OPENCODE_CONFIG_DIR',
+    'hf_token',
+  ])
+    vi.stubEnv(key, 'test-secret-or-override');
+  vi.stubEnv('OPENAI_API_KEY', 'test-provider-auth');
+  vi.mocked(mkdtempSync).mockReturnValue('/temp/isolated');
+  const proc = Object.assign(new EventEmitter(), {
+    stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: vi.fn(),
+  });
+  mock.spawn.mockReturnValue(proc);
+  await setup();
+  const pending = translate();
+  await vi.waitFor(() => expect(mock.spawn).toHaveBeenCalled());
+  const options = mock.spawn.mock.calls[0][2];
+  proc.stdout.emit('data', Buffer.from('{"translations":[{"id":"a","text":"Bonjour"}]}'));
+  proc.emit('close', 0);
+  await pending;
+  expect(options.cwd).toBe('/temp/isolated');
+  expect(options.env.OPENAI_API_KEY).toBe('test-provider-auth');
+  for (const key of [
+    'HF_TOKEN',
+    'HUGGING_FACE_HUB_TOKEN',
+    'OMNIVOICE_API_KEY',
+    'VOICESTUDIO_LLM_AGENT_TOKEN',
+    'OPENCODE_CONFIG_CONTENT',
+    'OPENCODE_PERMISSION',
+    'OPENCODE_CONFIG_DIR',
+    'hf_token',
+  ])
+    expect(options.env[key]).toBeUndefined();
+});
 
 it('stopping while the repair CLI is located prevents the spawn', async () => {
   await setup();

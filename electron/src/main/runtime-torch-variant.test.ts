@@ -57,6 +57,7 @@ async function fixture() {
   await mkdir(join(bundle, 'config'), { recursive: true });
   await mkdir(join(bundle, 'frontend', 'dist'), { recursive: true });
   await mkdir(join(bundle, 'omnivoice'));
+  await mkdir(join(bundle, 'vendor'), { recursive: true });
   for (const file of [
     'pyproject.toml',
     'README.md',
@@ -115,14 +116,17 @@ describe('resolveTorchVariant', () => {
     expect(resolveTorchVariant({}, 'linux', 'x64', gpu).variant).toBe('default');
     expect(resolveTorchVariant({}, 'win32', 'x64', gpu).variant).toBe('default');
   });
-  it('leaves macOS and Linux arm64 on their PyPI wheels', () => {
+  it('leaves macOS on its PyPI wheels', () => {
     for (const [platform, arch] of [
       ['darwin', 'arm64'],
       ['darwin', 'x64'],
-      ['linux', 'arm64'],
     ] as const) {
       expect(resolveTorchVariant({}, platform, arch, noGpu).variant).toBe('default');
     }
+  });
+  it('selects Linux ARM CPU wheels unless NVIDIA is present', () => {
+    expect(resolveTorchVariant({}, 'linux', 'arm64', noGpu).variant).toBe('cpu');
+    expect(resolveTorchVariant({}, 'linux', 'arm64', gpu).variant).toBe('default');
   });
   it('always uses CPU torch on Windows on ARM, GPU probe or not', () => {
     expect(resolveTorchVariant({}, 'win32', 'arm64', gpu).variant).toBe('cpu');

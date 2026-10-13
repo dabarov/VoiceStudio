@@ -53,7 +53,7 @@ def test_known_broken_pins_are_repaired_without_editing_upstream(tmp_path):
     repaired = repair(source)
     assert source.read_text() == original
     assert repaired.parent == source.parent  # relative includes still resolve
-    assert repaired.read_text() == original.replace('6.17.0', '6.17.3').replace('4.57.0', '4.57.1')
+    assert repaired.read_text() == original.replace('6.17.0', '6.17.3').replace('4.57.0', '4.57.1').replace('torch==2.8.0', 'torch==2.13.0')
     assert repair(source).read_text() == repaired.read_text()  # retry is stable
 
 

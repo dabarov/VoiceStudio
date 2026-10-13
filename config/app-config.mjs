@@ -16,6 +16,9 @@ function requiredPort(value, key) {
 
 export const PRODUCT_NAME = requiredString(rawConfig.productName, "productName");
 export const APP_ID = requiredString(rawConfig.appId, "appId");
+// A fork must explicitly opt in to upstream installers. Missing/malformed
+// configuration fails closed; the bundled value cannot be enabled by an env var.
+export const DESKTOP_UPDATES_ENABLED = rawConfig.desktopUpdatesEnabled === true;
 export const DEFAULT_BACKEND_PORT = requiredPort(rawConfig.ports?.backend, "backend");
 export const DEFAULT_WEB_PORT = requiredPort(rawConfig.ports?.web, "web");
 export const DEFAULT_ELECTRON_DEV_PORT = requiredPort(rawConfig.ports?.electronDev, "electronDev");

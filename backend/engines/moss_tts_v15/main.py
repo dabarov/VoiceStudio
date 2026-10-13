@@ -40,6 +40,16 @@ import re
 import struct
 import sys
 import traceback
+from pathlib import Path
+
+# This entrypoint also runs directly, outside the parent's import path/venv.
+import importlib.util
+_policy_spec = importlib.util.spec_from_file_location(
+    "_moss_sources", Path(__file__).resolve().parents[1] / "moss_sources.py",
+)
+_policy = importlib.util.module_from_spec(_policy_spec)
+_policy_spec.loader.exec_module(_policy)
+_snapshot_path = _policy.snapshot_path
 
 
 # Mirrors backend/services/subprocess_backend.py::MAX_FRAME_BYTES.
@@ -74,6 +84,8 @@ def _model_source() -> tuple[str, str]:
             "A custom MOSS model requires OMNIVOICE_MOSS_TTS_V15_REVISION="
             "<40-character commit SHA>; branches and tags are mutable."
         )
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo) or os.path.exists(repo):
+        raise RuntimeError("Custom MOSS source must be a Hugging Face repository, not a local path")
     return repo, revision
 
 #: ISO-639-1 → MOSS language name. MOSS's ``build_user_message`` takes a
@@ -175,8 +187,12 @@ def _load_model(stdout):
     # (Ampere+ CUDA, optional flash-attn) is opt-in via env.
     attn = os.environ.get("OMNIVOICE_MOSS_TTS_V15_ATTN", "sdpa")
 
+    # The processor forwards its kwargs to the separate codec repository.
+    # Download both at their own commit, then prevent any loader Hub lookup.
+    model_path = _snapshot_path(repo, revision)
+    codec_path = _snapshot_path(_policy.V15_CODEC_REPO, _policy.V15_CODEC_REVISION)
     processor = AutoProcessor.from_pretrained(
-        repo, revision=revision, trust_remote_code=True,
+        model_path, codec_path=codec_path, trust_remote_code=True, local_files_only=True,
     )
     # The audio tokenizer is a separate sub-module that must be moved to the
     # device independently (easy to miss — see upstream README).
@@ -185,9 +201,10 @@ def _load_model(stdout):
     _send(stdout, {"op": "progress", "stage": "loading_model", "percent": 50})
 
     model = AutoModel.from_pretrained(
-        repo,
-        revision=revision,
+        model_path,
         trust_remote_code=True,
+        local_files_only=True,
+        use_safetensors=True,
         attn_implementation=attn,
         torch_dtype=dtype,
     ).to(device)
@@ -293,6 +310,15 @@ def _handle_synthesize(msg: dict, stdout) -> None:
 
 
 def main() -> int:
+    # Preserve existing user-managed environments; new managed installs supply
+    # the adapter. Its absence never changes an older working TorchAudio API.
+    try:
+        from voicestudio_audio_compat import activate
+    except ModuleNotFoundError as exc:
+        if exc.name != "voicestudio_audio_compat":
+            raise
+    else:
+        activate()
     stdin = sys.stdin.buffer
     # Frames go down a PRIVATE fd, and fd 1 is pointed at stderr (#1428).
     #

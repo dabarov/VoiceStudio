@@ -23,6 +23,7 @@ import tempfile
 import threading
 import time
 import traceback
+from pathlib import Path
 
 # Mirrors services/subprocess_backend.py::MAX_FRAME_BYTES.
 MAX_FRAME_BYTES = 64 * 1024 * 1024
@@ -127,17 +128,20 @@ def _load_service(stdout):
         return _SERVICE
     _send(stdout, {"op": "progress", "stage": "loading_model", "percent": 0})
     with _heartbeat(stdout, "loading_model"):
-        from moss_tts_nano.defaults import (  # type: ignore[import-not-found]  # noqa: PLC0415
-            DEFAULT_AUDIO_TOKENIZER_PATH,
-            DEFAULT_CHECKPOINT_PATH,
-        )
+        # The script runs directly in a separate venv. Import only the shared
+        # stdlib-only source policy, without importing the app or engine registry.
+        import importlib.util
+        policy_file = Path(__file__).resolve().parents[1] / "moss_sources.py"
+        spec = importlib.util.spec_from_file_location("_moss_sources", policy_file)
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+        checkpoint = policy.snapshot_path(*policy.nano_source())
+        codec = policy.snapshot_path(*policy.nano_source(codec=True))
         from moss_tts_nano_runtime import NanoTTSService  # type: ignore[import-not-found]  # noqa: PLC0415
 
         service = NanoTTSService(
-            checkpoint_path=os.environ.get("OMNIVOICE_MOSS_TTS_MODEL", DEFAULT_CHECKPOINT_PATH),
-            audio_tokenizer_path=os.environ.get(
-                "OMNIVOICE_MOSS_TTS_TOKENIZER", DEFAULT_AUDIO_TOKENIZER_PATH
-            ),
+            checkpoint_path=checkpoint,
+            audio_tokenizer_path=codec,
             # Upstream writes every synthesis to a file; keep them out of the
             # install folder (and see _handle_synthesize: one file, reused).
             output_dir=tempfile.mkdtemp(prefix="moss-tts-nano-"),
@@ -208,6 +212,15 @@ def _handle_synthesize(msg: dict, stdout) -> None:
 
 
 def main() -> int:
+    # Preserve existing user-managed environments; new managed installs supply
+    # the adapter. Its absence never changes an older working TorchAudio API.
+    try:
+        from voicestudio_audio_compat import activate
+    except ModuleNotFoundError as exc:
+        if exc.name != "voicestudio_audio_compat":
+            raise
+    else:
+        activate()
     stdin = sys.stdin.buffer
     # Frames go down a PRIVATE fd, and fd 1 is pointed at stderr (#1428): the
     # libraries this loads print to fd 1, and those bytes would otherwise

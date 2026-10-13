@@ -1,34 +1,9 @@
-"""cuDNN 8 side-load, and — the point of this module — a *probe* for it.
+"""CUDA 12 libraries for CTranslate2 4.8 alongside PyTorch's CUDA 13 runtime.
 
-CTranslate2 (pinned at 4.4.0; the engine under WhisperX and faster-whisper)
-links against **cuDNN 8**, while PyTorch 2.8+ ships cuDNN 9. The two coexist:
-the Rust bootstrap side-loads ``nvidia-cudnn-cu12==8.9.7.29`` into a
-``cudnn8_compat/`` directory beside the venv's real site-packages (#827/#869),
-and we ``ctypes``-preload those libraries at startup so CTranslate2's own
-``LoadLibrary``/``dlopen`` finds them already resident in the process.
-
-When that side-load is missing, CTranslate2 does not raise. It prints
-
-    Could not locate cudnn_ops_infer64_8.dll. Please make sure it is in your
-    library path!
-
-and calls ``__fastfail`` — killing the **whole backend process** with
-``0xC0000409`` (STATUS_STACK_BUFFER_OVERRUN, surfaced as exit code
-``-1073740791``). Python never gets a frame, so there is no traceback, no
-fallback, and nothing for the crash notice to classify. The desktop shell
-restarts the backend, the user retries, and it dies again — #1371.
-
-The bug was never that the preload could fail. It is that we **computed the
-answer and threw it away**: the old inline preload in ``main.py`` silently
-``pass``-ed on a missing directory and on every ``OSError``, then handed
-control to a native library that treats the same condition as fatal. So this
-module keeps the outcome and exposes :func:`ctranslate2_cudnn_status`, letting
-``asr_backend`` route around a doomed engine *before* calling into it —
-exactly how the CTranslate2 exec-stack failure (#692) is already handled.
-
-Deliberately stdlib-only: ``engines/_asr_sidecar/main.py`` runs in a child
-process with a clean import path and must not drag in the heavy ``services``
-package to get this.
+The historical module name is retained for callers. The managed runtime now
+supplies cuDNN 9 and cuBLAS 12 in a separate directory. Both libraries must load
+before entering CTranslate2, whose missing-library failures can abort Python.
+This module remains stdlib-only for the isolated ASR sidecar.
 """
 from __future__ import annotations
 
@@ -44,9 +19,10 @@ logger = logging.getLogger(__name__)
 # in the same process, through the same OS loader, a failure here is the same
 # failure CTranslate2 is about to hit.
 _SENTINEL_LIB = (
-    "cudnn_ops_infer64_8.dll" if sys.platform == "win32" else "libcudnn_ops_infer.so.8"
+    "cudnn64_9.dll" if sys.platform == "win32" else "libcudnn.so.9"
 )
-_LIB_GLOB = "cudnn*64_8.dll" if sys.platform == "win32" else "libcudnn*.so.8"
+_BLAS_SENTINEL = "cublas64_12.dll" if sys.platform == "win32" else "libcublas.so.12"
+_LIB_GLOB = "cudnn*64_9.dll" if sys.platform == "win32" else "libcudnn*.so.9"
 
 _preloaded: bool = False
 _status: tuple[bool, str] | None = None
@@ -61,7 +37,7 @@ def _project_root() -> str:
 
 
 def compat_dirs() -> list[str]:
-    """Every plausible ``cudnn8_compat`` location, most specific first.
+    """Every plausible ``ctranslate2_cuda12`` location, most specific first.
 
     The old inline preload hardcoded ``<project root>/.venv``. That is right
     for the managed desktop install and wrong everywhere else — a differently
@@ -80,14 +56,14 @@ def compat_dirs() -> list[str]:
     roots = [os.path.join(_project_root(), ".venv"), sys.prefix]
     out: list[str] = []
     for root in roots:
-        path = os.path.join(root, *site_tail, "cudnn8_compat", *lib_tail)
+        path = os.path.join(root, *site_tail, "ctranslate2_cuda12", *lib_tail)
         if path not in out:
             out.append(path)
     return out
 
 
 def preload() -> None:
-    """Load the side-loaded cuDNN 8 libraries into this process. Idempotent.
+    """Load the side-loaded cuDNN 9 libraries into this process. Idempotent.
 
     Best-effort by design — a host with no side-load is not an error here, it
     is a fact :func:`ctranslate2_cudnn_status` reports later.
@@ -105,30 +81,27 @@ def preload() -> None:
     for lib_dir in compat_dirs():
         if not os.path.isdir(lib_dir):
             continue
-        if sys.platform == "win32":
-            # Make the directory searchable by *name* as well, so a CTranslate2
-            # LoadLibrary for a dependent library we did not preload explicitly
-            # still resolves instead of aborting the process.
-            #
-            # The returned cookie must be KEPT: it is a context manager whose
-            # close/__del__ removes the directory again, so discarding it makes
-            # the call a silent no-op — the exact failure this module exists to
-            # prevent, reintroduced one line lower (CodeRabbit, #1401). Hold it
-            # for the life of the process.
-            try:
-                _dll_dir_cookies.append(os.add_dll_directory(lib_dir))
-            except (OSError, AttributeError) as e:
-                logger.debug("cuDNN 8 DLL directory not added (%s): %s", lib_dir, e)
-        for so in sorted(glob.glob(os.path.join(lib_dir, _LIB_GLOB))):
-            try:
-                ctypes.CDLL(so, mode=mode)
-            except OSError as e:
-                logger.debug("cuDNN 8 preload skipped %s: %s", so, e)
+        blas_dir = os.path.join(os.path.dirname(os.path.dirname(lib_dir)), "cublas", os.path.basename(lib_dir))
+        blas_glob = "cublas*64_12.dll" if sys.platform == "win32" else "libcublas*.so.12"
+        for directory, pattern in ((blas_dir, blas_glob), (lib_dir, _LIB_GLOB)):
+            if not os.path.isdir(directory):
+                continue
+            if sys.platform == "win32":
+                try:
+                    _dll_dir_cookies.append(os.add_dll_directory(directory))
+                except (OSError, AttributeError) as exc:
+                    logger.debug("CUDA DLL directory not added: %s", exc)
+            # cuBLASLt is a dependency of cuBLAS; load it first on Linux.
+            for library in sorted(glob.glob(os.path.join(directory, pattern)), reverse=True):
+                try:
+                    ctypes.CDLL(library, mode=mode)
+                except OSError as exc:
+                    logger.debug("CUDA compatibility preload skipped %s: %s", library, exc)
         return  # first directory that exists wins
 
 
 def _torch_wants_cudnn8() -> tuple[bool, str]:
-    """Whether CTranslate2 will reach for cuDNN 8 *on this host at all*.
+    """Whether CTranslate2 will reach for cuDNN 9 *on this host at all*.
 
     cuDNN is a CUDA library: with no CUDA device, CTranslate2 runs on the CPU
     and never touches it, so a missing side-load is harmless and must not
@@ -137,7 +110,7 @@ def _torch_wants_cudnn8() -> tuple[bool, str]:
     no ROCm backend, so it is CPU-only there regardless. Without this branch a
     Windows/CUDA fix would silently downgrade every ROCm user's ASR engine.
     Mirrors ``bootstrap.rs::classify_cuda_probe``, which likewise declines to
-    install cuDNN 8 on HIP hosts (#124).
+    install cuDNN 9 on HIP hosts (#124).
     """
     try:
         import torch
@@ -154,13 +127,13 @@ def _torch_wants_cudnn8() -> tuple[bool, str]:
 
 
 def ctranslate2_cudnn_status() -> tuple[bool, str]:
-    """``(usable, reason)`` — can CTranslate2 load cuDNN 8 in this process?
+    """``(usable, reason)`` — can CTranslate2 load cuDNN 9 in this process?
 
     Cached: the answer cannot change within a process, and it is consulted on
     every ASR engine selection.
 
     Conservative on purpose. A false negative costs a user WhisperX's forced
-    alignment (and so lip-sync accuracy), so this returns True whenever cuDNN 8
+    alignment (and so lip-sync accuracy), so this returns True whenever cuDNN 9
     is not actually required, and only reports False for the one condition it
     can prove: the library the failure message names will not load, here, now,
     through the same loader CTranslate2 is about to use.
@@ -192,23 +165,24 @@ def _compute_status() -> tuple[bool, str]:
     # already answers "not required". One gate, testable on any platform.
     needed, why = _torch_wants_cudnn8()
     if not needed:
-        return True, f"cuDNN 8 not required ({why})"
+        return True, f"cuDNN 9 not required ({why})"
 
     preload()
     try:
+        _try_load(_BLAS_SENTINEL)
         _try_load(_SENTINEL_LIB)
     except OSError as e:
         return False, (
-            f"CUDA is active but {_SENTINEL_LIB} cannot be loaded ({e}). "
+            f"CUDA is active but cuBLAS 12 or {_SENTINEL_LIB} cannot be loaded ({e}). "
             f"WhisperX and faster-whisper are CTranslate2, which requires "
-            f"cuDNN 8; loading it is not optional and its absence aborts the "
+            f"cuDNN 9; loading it is not optional and its absence aborts the "
             f"backend process outright rather than raising (#1371). Reinstall "
             f"the compat libraries with "
-            f"`uv pip install --target <venv>/{'Lib/site-packages' if sys.platform == 'win32' else 'lib/pythonX.Y/site-packages'}/cudnn8_compat "
-            f"nvidia-cudnn-cu12==8.9.7.29`, or pin a non-CTranslate2 engine "
+            f"`uv pip install --target <venv>/{'Lib/site-packages' if sys.platform == 'win32' else 'lib/pythonX.Y/site-packages'}/ctranslate2_cuda12 "
+            f"nvidia-cudnn-cu12==9.20.0.48 nvidia-cublas-cu12==12.9.1.4`, or pin a non-CTranslate2 engine "
             f"with OMNIVOICE_ASR_BACKEND=pytorch-whisper."
         )
-    return True, "cuDNN 8 loadable"
+    return True, "cuDNN 9 loadable"
 
 
 def reset_cache_for_tests() -> None:

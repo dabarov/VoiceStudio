@@ -574,3 +574,8 @@ def test_omitted_request_join_options_preserve_existing_audio():
     from api.routers.audiobook import LongformRenderRequest
     request = LongformRenderRequest()
     assert (request.line_gap_ms, request.paragraph_gap_ms, request.trim_edges) == (0, 0, False)
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

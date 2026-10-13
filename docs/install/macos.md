@@ -18,7 +18,7 @@ is no longer maintained; if you still run it, follow the
 
 ## Requirements
 
-- **macOS 13.3 (Ventura) or newer** on Apple Silicon (Intel: UI only, see the
+- **macOS 14 (Sonoma) or newer** on Apple Silicon (Intel: UI only, see the
   note above).
 - **~10 GB free disk** for the app, its Python environment, and model weights.
 
@@ -35,7 +35,14 @@ run). Power users can inspect or override the binaries in
 Optional but recommended: **a Hugging Face account** for diarization and the
 larger TTS models. See [docs/setup/huggingface-token.md](../setup/huggingface-token.md).
 
-## Install (DMG)
+## Install this security fork
+
+Use the locally built app from this fork. Upstream release installers do not
+contain these patches. Optional engines remain available through Model Catalogue;
+use its managed installer to receive the patched dependencies. See
+[security-fork notes](../fork-security.md).
+
+## Upstream install (DMG)
 
 Download the DMG that matches your Mac (check **Apple menu → About This Mac →
 Chip/Processor**) from the

@@ -5,6 +5,12 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DESKTOP_UPDATES_ENABLED } from '../../config/app-config.mjs';
+
+if (!DESKTOP_UPDATES_ENABLED) {
+  console.log('Upstream updates disabled: no update feed is packaged.');
+  process.exit(0);
+}
 
 const electronRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);

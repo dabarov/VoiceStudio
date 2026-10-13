@@ -1,5 +1,10 @@
 # Releasing VoiceStudio
 
+This branch is a security fork with `desktopUpdatesEnabled: false` in
+`config/app.json`. It packages no update feed and skips AppImage update metadata.
+The upstream publication process below is reference documentation, not a release
+procedure for this fork. See [fork security notes](fork-security.md).
+
 Electron is the only maintained desktop distribution. Tauri ended at v0.5.3;
 its signed updater feeds and installers are immutable compatibility assets.
 

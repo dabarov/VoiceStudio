@@ -173,7 +173,7 @@ class SidecarSpec:
     # torch/torchaudio pins for an upstream that leaves torch unpinned. Left
     # to the resolver, PyPI's newest torch (CPU-only on Windows) pairs with a
     # CUDA torchaudio from the other index. The host picks the build of the
-    # pinned pair: `+cu128` on a CUDA host, `+cpu` on other Windows and Linux
+    # pinned stack: `+cu130` on a CUDA host, `+cpu` on other Windows and Linux
     # hosts, plain on macOS.
     torch_pins: tuple[str, ...] = ()
     # Submodule trees the upstream repository needs (see ExtraSource).
@@ -181,11 +181,12 @@ class SidecarSpec:
     # Download only these files of the weights repo (huggingface_hub
     # allow_patterns). Empty downloads the whole repository.
     weights_allow_patterns: tuple[str, ...] = ()
-    # Require the completion marker the import probe writes. Only IndexTTS,
-    # installed before the marker existed, opts out.
+    # Require the completion marker written after a successful import probe.
     requires_install_marker: bool = True
     # Opt-in recipe revision: legacy markers stay valid for unchanged engines.
     install_revision: str = ""
+    # Explicit opt-in: ONNX-only and future non-torch engines need no adapter.
+    native_compat: bool = False
     # The weights repo is also an ordinary Model Catalogue download that the
     # engine's in-process path uses (CosyVoice). Otherwise it is one only the
     # installer can place, and a plain download is not offered for it.
@@ -249,7 +250,7 @@ def _torch_pin_args(spec: "SidecarSpec") -> list[str]:
     from core.torch_indexes import UV_PIP_CPU_ARGS, UV_PIP_CU128_ARGS
 
     if _host_family() == "cuda":
-        return [f"{pin}+cu128" for pin in spec.torch_pins] + list(UV_PIP_CU128_ARGS)
+        return [f"{pin}+cu130" for pin in spec.torch_pins] + list(UV_PIP_CU128_ARGS)
     if sys.platform in ("win32", "linux"):
         return [f"{pin}+cpu" for pin in spec.torch_pins] + list(UV_PIP_CPU_ARGS)
     return list(spec.torch_pins)
@@ -391,6 +392,7 @@ _COSYVOICE_REQUIREMENTS = str(
 SPECS: dict[str, SidecarSpec] = {
     "indextts2": SidecarSpec(
         engine_id="indextts2",
+        native_compat=True,
         display_name="IndexTTS 2.5",
         repo_url="https://github.com/index-tts/index-tts.git",
         tarball_url=(
@@ -423,7 +425,8 @@ SPECS: dict[str, SidecarSpec] = {
         installed_probe=_indextts_installed,
         # Installed before the completion marker existed; its weights
         # marker already proves a finished install.
-        requires_install_marker=False,
+        requires_install_marker=True,
+        install_revision="native-torch-2.13-v1",
         # Upstream routes torch/torchaudio to the cu128 index on Linux and
         # Windows, which sees no AMD GPU — take the ROCm build on ROCm hosts.
         uses_rocm_index=True,
@@ -433,6 +436,8 @@ SPECS: dict[str, SidecarSpec] = {
     # first synthesis, as its manual install always has.
     "moss-tts-v15": SidecarSpec(
         engine_id="moss-tts-v15",
+        native_compat=True,
+        install_revision="native-torch-2.13-v1",
         display_name="MOSS-TTS-v1.5",
         repo_url="https://github.com/OpenMOSS/MOSS-TTS.git",
         tarball_url=(
@@ -460,6 +465,8 @@ SPECS: dict[str, SidecarSpec] = {
     ),
     "confucius4-tts": SidecarSpec(
         engine_id="confucius4-tts",
+        native_compat=True,
+        install_revision="native-torch-2.13-v1",
         display_name="Confucius4-TTS",
         repo_url="https://github.com/netease-youdao/Confucius4-TTS.git",
         tarball_url=(
@@ -478,8 +485,8 @@ SPECS: dict[str, SidecarSpec] = {
         source_required_path="setup.py",
         venv_args=("--python", "3.10"),
         install_args=("-r", "{checkout}/requirements.txt"),
-        # torch==2.7.0: CPU-only from PyPI on Windows; the CUDA index supplies
-        # 2.7.0+cu128, which satisfies the same pin.
+        # The shared override replaces upstream native pins with the patched
+        # stack; the official index supplies the selected host build.
         uses_cuda_index=True,
         docs_path="docs/engines/confucius4-tts.md",
         # ~7 GB venv now, ~5 GB of weights on first synthesis.
@@ -492,6 +499,8 @@ SPECS: dict[str, SidecarSpec] = {
     ),
     "dots-tts": SidecarSpec(
         engine_id="dots-tts",
+        native_compat=True,
+        install_revision="native-torch-2.13-v1",
         display_name="dots.tts",
         repo_url="https://github.com/rednote-hilab/dots.tts.git",
         tarball_url=(
@@ -539,6 +548,8 @@ SPECS: dict[str, SidecarSpec] = {
     ),
     "pockettts": SidecarSpec(
         engine_id="pockettts",
+        native_compat=True,
+        install_revision="native-torch-2.13-v1",
         display_name="PocketTTS",
         repo_url="",
         tarball_url="",
@@ -558,11 +569,12 @@ SPECS: dict[str, SidecarSpec] = {
         ),
     ),
     # Run in a sidecar from its own venv (engines/voxcpm2_subprocess). voxcpm
-    # leaves torch unpinned, so the pair is pinned here; each build of it was
-    # resolved with voxcpm==2.0.3 on 2026-09-10 (Windows and Linux: +cu128 and
-    # +cpu; Apple Silicon: plain). Weights download on first synthesis.
+    # leaves torch unpinned, so the patched native stack is pinned here.
+    # Weights download on first synthesis.
     "voxcpm2": SidecarSpec(
         engine_id="voxcpm2",
+        native_compat=True,
+        install_revision="native-torch-2.13-v1",
         display_name="VoxCPM2",
         repo_url="",
         tarball_url="",
@@ -572,7 +584,7 @@ SPECS: dict[str, SidecarSpec] = {
         has_source=False,
         venv_args=("--python", "3.11"),
         install_args=("voxcpm==2.0.3",),
-        torch_pins=("torch==2.11.0", "torchaudio==2.11.0"),
+        torch_pins=("torch==2.13.0", "torchaudio==2.11.0"),
         docs_path="docs/engines/voxcpm2.md",
         # CUDA torch (~5 GB unpacked) + transformers.
         required_bytes=10 * _GIB,
@@ -584,9 +596,10 @@ SPECS: dict[str, SidecarSpec] = {
     # Upstream is unpinned and its entry point has moved before (#1287), so the
     # install pins a reviewed commit (2026-09-06) and the sidecar drives the
     # runtime that commit ships (moss_tts_nano_runtime.NanoTTSService). Its
-    # pyproject pins torch==2.7.0 exactly, so the CUDA index yields +cu128.
+    # upstream native pins are replaced by the shared security override.
     "moss-tts-nano": SidecarSpec(
         engine_id="moss-tts-nano",
+        native_compat=True,
         display_name="MOSS-TTS-Nano",
         repo_url="https://github.com/OpenMOSS/MOSS-TTS-Nano.git",
         tarball_url=(
@@ -611,9 +624,9 @@ SPECS: dict[str, SidecarSpec] = {
         # (#2100). Pulling soundfile alongside the editable install keeps
         # every audio read inside this engine's own venv.
         install_args=("-e", "{checkout}", "soundfile"),
-        install_revision="audio-backend-v1",
+        install_revision="audio-backend-v1-native-torch-2.13-v1",
         uses_cuda_index=True,
-        # torch 2.7 (CUDA build on NVIDIA hosts) + transformers + onnxruntime.
+        # Patched native torch + transformers + onnxruntime.
         # The model and its audio tokenizer download on first synthesis.
         required_bytes=8 * _GIB,
         installed_probe=_in_app_env("moss_tts_nano"),
@@ -628,6 +641,7 @@ SPECS: dict[str, SidecarSpec] = {
     # are downloaded (about 5.4 of 9.8 GB).
     "cosyvoice": SidecarSpec(
         engine_id="cosyvoice",
+        native_compat=True,
         display_name="CosyVoice 3",
         repo_url="https://github.com/FunAudioLLM/CosyVoice.git",
         tarball_url=(
@@ -671,8 +685,8 @@ SPECS: dict[str, SidecarSpec] = {
         ),
         venv_args=("--python", "3.10"),
         install_args=("-r", _COSYVOICE_REQUIREMENTS, "{checkout}/third_party/PyWorld"),
-        install_revision="security-floors-v3",
-        torch_pins=("torch==2.7.0", "torchaudio==2.7.0"),
+        install_revision="security-floors-v3-native-torch-2.13-v1",
+        torch_pins=("torch==2.13.0", "torchaudio==2.11.0"),
         weights_repo_id="FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
         weights_revision="29e01c4e8d000f4bcd70751be16fa94bf3d85a18",
         weights_subdir="pretrained_models/Fun-CosyVoice3-0.5B",
@@ -1148,6 +1162,9 @@ def _healthy(spec: SidecarSpec) -> bool:
     # finished; only the marker the import probe writes does. IndexTTS
     # predates the marker and keeps its weights check, so no existing install
     # is asked to reinstall.
+    if spec.uses_rocm_index and _rocm_index_url() is not None:
+        if not _venv_torch_is_rocm(checkout / ".venv"):
+            return False
     if not spec.requires_install_marker:
         # #2371 recipe change: on a host where the installer WOULD place a
         # ROCm torch, a managed venv provisioned before it still carries
@@ -1635,9 +1652,19 @@ def _step_install_deps(spec: SidecarSpec, job: dict) -> None:
     elif spec.cpu_torch_index:
         from core.torch_indexes import UV_PIP_CPU_ARGS
         target += list(UV_PIP_CPU_ARGS)
-    elif spec.uses_cuda_index and _host_family() == "cuda":
+    elif (spec.uses_cuda_index or spec.native_compat) and _host_family() == "cuda":
         from core.torch_indexes import UV_PIP_CU128_ARGS
         target += list(UV_PIP_CU128_ARGS)
+    elif spec.native_compat and sys.platform in ("linux", "win32"):
+        from core.torch_indexes import UV_PIP_CPU_ARGS
+        target += list(UV_PIP_CPU_ARGS)
+    if spec.native_compat:
+        from engines.native_compat import install_args
+        native_args = install_args(spec.engine_id)
+        # The ROCm recipe already supplies this singleton uv flag.
+        if "--no-sources" in target:
+            native_args.remove("--no-sources")
+        target += native_args
     # Always `--python <this engine's venv>`: the install can only ever land in
     # the venv this engine owns, never the app's interpreter.
     job.pop("_last_run_output", None)
@@ -1685,6 +1712,9 @@ def _step_verify(spec: SidecarSpec, job: dict) -> None:
             if spec.probe_code
             else f"import {spec.probe_module}"
         )
+        if spec.native_compat:
+            from engines.native_compat import PROBE_PREFIX
+            probe = PROBE_PREFIX + probe
         proc = subprocess.run(
             [str(py), "-c", probe],
             capture_output=True, timeout=_IMPORT_PROBE_TIMEOUT_S,

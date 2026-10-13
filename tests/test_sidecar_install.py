@@ -897,6 +897,7 @@ def test_indextts25_health_accepts_either_config_name(monkeypatch):
         repo_id=spec.weights_repo_id,
         revision=spec.weights_revision,
     )
+    (checkout / si._INSTALL_COMPLETE_MARKER).write_text(f"{spec.probe_module}\n{spec.install_revision}\n")
     # What a fresh upstream snapshot looks like.
     assert si._healthy(spec) is True
     # What the pre-fix workaround left behind.
@@ -1012,7 +1013,7 @@ def test_router_uninstall_maps_refusals_to_http_errors(monkeypatch):
 # ones added later.
 
 _ALL_SPEC_IDS = sorted(si.SPECS)
-_PYTORCH_INDEX = "https://download.pytorch.org/whl/cu128"
+_PYTORCH_INDEX = "https://download.pytorch.org/whl/cu130"
 
 
 def _capture_install_argvs(monkeypatch, family="cuda"):
@@ -1095,6 +1096,7 @@ def test_uninstalling_one_engine_leaves_every_other_engine_intact(monkeypatch):
     ],
 )
 def test_new_specs_install_recipe(monkeypatch, engine_id, venv_args, install_args, env_var):
+    from engines.native_compat import install_args as native_install_args
     spec = si.get_spec(engine_id)
     # The env var must be the one the engine's own bootstrap reads, or the
     # install lands in a directory the engine never looks at.
@@ -1109,7 +1111,7 @@ def test_new_specs_install_recipe(monkeypatch, engine_id, venv_args, install_arg
     assert venv_cmd[3:] == venv_args
     pip = next(a for a in argvs if a[1:3] == ["pip", "install"])
     assert pip[5:] == [arg.replace("{c}", checkout).replace("{uri}", si.managed_checkout(spec).resolve().as_uri())
-                      for arg in install_args]
+                      for arg in install_args] + native_install_args(spec.engine_id)
 
 
 def test_moss_tts_nano_probe_asserts_an_audio_backend_is_present(monkeypatch):
@@ -1142,7 +1144,7 @@ def test_cuda_index_is_added_only_for_cuda_pinned_specs_on_cuda_hosts(
     si._step_install_deps(spec, si._new_job(engine_id))
     pip = next(a for a in argvs if a[1:3] == ["pip", "install"])
     has_index = _PYTORCH_INDEX in pip
-    assert has_index == (family == "cuda" and (spec.uses_cuda_index or bool(spec.torch_pins)))
+    assert has_index == (family == "cuda" and (spec.uses_cuda_index or bool(spec.torch_pins) or (spec.native_compat and not spec.cpu_torch_index)))
     if has_index:
         i = pip.index("--extra-index-url")
         assert tuple(pip[i:i + len(UV_PIP_CU128_ARGS)]) == UV_PIP_CU128_ARGS
@@ -1398,8 +1400,8 @@ def test_a_failed_dependency_install_is_repaired_not_reported_installed(monkeypa
 @pytest.mark.parametrize(
     ("family", "platform", "suffix", "index"),
     [
-        ("cuda", "win32", "+cu128", "https://download.pytorch.org/whl/cu128"),
-        ("cuda", "linux", "+cu128", "https://download.pytorch.org/whl/cu128"),
+        ("cuda", "win32", "+cu130", "https://download.pytorch.org/whl/cu130"),
+        ("cuda", "linux", "+cu130", "https://download.pytorch.org/whl/cu130"),
         ("cpu", "win32", "+cpu", "https://download.pytorch.org/whl/cpu"),
         ("rocm", "linux", "+cpu", "https://download.pytorch.org/whl/cpu"),
         ("mps", "darwin", "", None),
@@ -1448,15 +1450,15 @@ def _capture_rocm_install(monkeypatch, family, variant=None):
 def test_rocm_host_installs_rocm_torch_for_indextts2(monkeypatch):
     """Fail-before/pass-after for #2371: the step used to run a bare
     `uv pip install -e <checkout>`, so upstream's `[tool.uv.sources]` routed
-    torch to the cu128 index — a wheel that cannot see an AMD GPU, leaving
+    torch to the cu130 index — a wheel that cannot see an AMD GPU, leaving
     the whole sidecar on CPU (~17x slower on the reporter's RX 6800 XT)."""
     from core.torch_indexes import PYTORCH_CU128_INDEX_URL
 
     pip, rocm_index = _capture_rocm_install(monkeypatch, family="rocm")
-    # Upstream's cu128 tool.uv.sources must be ignored for torch to resolve.
-    assert "--no-sources" in pip
-    assert "torch==2.8.0+rocm6.4" in pip
-    assert "torchaudio==2.8.0+rocm6.4" in pip
+    # Upstream's cu130 tool.uv.sources must be ignored for torch to resolve.
+    assert pip.count("--no-sources") == 1
+    assert "torch==2.13.0+rocm7.1" in pip
+    assert "torchaudio==2.11.0+rocm7.1" in pip
     i = pip.index("--extra-index-url")
     assert pip[i + 1] == rocm_index
     assert PYTORCH_CU128_INDEX_URL not in pip
@@ -1467,19 +1469,18 @@ def test_rocm_variant_env_opts_in_before_the_family_probe_reports_rocm(monkeypat
     while the main venv swap has not landed yet (family still cpu)."""
     pip, _ = _capture_rocm_install(monkeypatch, family="cpu", variant=" ROCm ")
     assert "--no-sources" in pip
-    assert "torch==2.8.0+rocm6.4" in pip
+    assert "torch==2.13.0+rocm7.1" in pip
 
 
 def test_rocm_torch_never_leaks_to_other_hosts(monkeypatch):
-    """A CUDA host still resolves torch through upstream's own cu128 sources,
-    and a CPU host keeps its existing install — ROCm args are ROCm-only."""
+    """CPU/CUDA use the patched host source; ROCm args remain ROCm-only."""
     from core.torch_indexes import PYTORCH_ROCM_INDEX_URL
 
     for family in ("cuda", "cpu"):
         pip, _ = _capture_rocm_install(monkeypatch, family=family)
-        assert "--no-sources" not in pip
+        assert "--no-sources" in pip
         assert PYTORCH_ROCM_INDEX_URL not in pip
-        assert not any(a.startswith("torch==2.8.0+") for a in pip)
+        assert not any("+rocm" in a for a in pip)
 
 
 def test_rocm_args_never_reach_engines_that_did_not_opt_in(monkeypatch):
@@ -1500,7 +1501,7 @@ def test_rocm_args_never_reach_engines_that_did_not_opt_in(monkeypatch):
         argvs.clear()
         si._step_install_deps(spec, si._new_job(engine_id))
         pip = next(a for a in argvs if a[1:3] == ["pip", "install"])
-        assert "--no-sources" not in pip, engine_id
+        assert ("--no-sources" in pip) == spec.native_compat, engine_id
         assert PYTORCH_ROCM_INDEX_URL not in pip, engine_id
 
 
@@ -1509,11 +1510,11 @@ def test_rocm_index_env_is_the_index_uv_resolves_against(monkeypatch):
     but the index appended to uv stayed the hard-coded public one — a
     mirror's pins looked up on someone else's server, bypassing the mirror
     a restricted network depends on."""
-    mirror = "https://mirror.example.com/pytorch/rocm6.4"
+    mirror = "https://mirror.example.com/pytorch/rocm7.1"
     monkeypatch.setenv("OMNIVOICE_TORCH_INDEX", mirror)
     pip, public = _capture_rocm_install(monkeypatch, family="rocm")
     assert "--no-sources" in pip
-    assert "torch==2.8.0+rocm6.4" in pip  # tag still from the mirror's tail
+    assert "torch==2.13.0+rocm7.1" in pip  # tag still from the mirror's tail
     assert mirror in pip
     assert public not in pip
 
@@ -1522,13 +1523,13 @@ def test_rocm_index_env_is_the_index_uv_resolves_against(monkeypatch):
 
 _CUDA_TORCH_VERSION_PY = (
     "from typing import Optional\n"
-    "__version__ = '2.8.0+cu128'\n"
+    "__version__ = '2.8.0+cu130'\n"
     "cuda: Optional[str] = '12.8'\n"
     "hip: Optional[str] = None\n"
 )
 _ROCM_TORCH_VERSION_PY = (
     "from typing import Optional\n"
-    "__version__ = '2.8.0+rocm6.4'\n"
+    "__version__ = '2.8.0+rocm7.1'\n"
     "cuda: Optional[str] = None\n"
     "hip: Optional[str] = '6.4.43482'\n"
 )
@@ -1558,6 +1559,7 @@ def _mk_complete_indextts2_install(monkeypatch, torch_version_py: str):
     torch_dir = checkout / ".venv" / "lib" / "python3.11" / "site-packages" / "torch"
     torch_dir.mkdir(parents=True)
     (torch_dir / "version.py").write_text(torch_version_py)
+    (checkout / si._INSTALL_COMPLETE_MARKER).write_text(f"{spec.probe_module}\n{spec.install_revision}\n")
     return spec
 
 
@@ -1698,7 +1700,7 @@ def test_weights_from_an_earlier_run_do_not_prove_the_dependencies_finished():
     (checkout / si._INSTALL_COMPLETE_MARKER).write_text("x\n", encoding="utf-8")
     assert si._healthy(spec)
     # IndexTTS predates the marker and keeps its weights-only check.
-    assert si.get_spec("indextts2").requires_install_marker is False
+    assert si.get_spec("indextts2").requires_install_marker is True
 
 
 def _tarball_with_absolute_symlink() -> bytes:

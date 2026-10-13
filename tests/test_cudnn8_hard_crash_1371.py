@@ -1,9 +1,9 @@
-"""#1371 — a missing cuDNN 8 must not kill the backend process.
+"""#1371 — a missing cuDNN 9 must not kill the backend process.
 
 CTranslate2 4.4.0 (the engine under WhisperX and faster-whisper) requires
-cuDNN 8 while torch ships cuDNN 9. When the side-loaded cuDNN 8 is absent,
+cuDNN 9 while torch ships cuDNN 9. When the side-loaded cuDNN 9 is absent,
 CTranslate2 does not raise — it prints ``Could not locate
-cudnn_ops_infer64_8.dll`` and ``__fastfail``s, taking the whole backend down
+cudnn64_9.dll`` and ``__fastfail``s, taking the whole backend down
 with ``0xC0000409`` (exit code ``-1073740791``). There is no traceback to
 classify and no exception to fall back from, so the shell restarts the backend
 and the next transcribe kills it again.
@@ -54,7 +54,7 @@ def ab():
 
 @pytest.fixture
 def cudnn8_missing(monkeypatch, cudnn8):
-    """A CUDA host whose cuDNN 8 will not load — the #1371 machine."""
+    """A CUDA host whose cuDNN 9 will not load — the #1371 machine."""
     monkeypatch.setattr(cudnn8, "_preloaded", True)  # nothing to preload
     monkeypatch.setattr(cudnn8, "_torch_wants_cudnn8", lambda: _CUDA_PRESENT)
 
@@ -81,7 +81,7 @@ def test_missing_cudnn8_on_a_cuda_host_is_reported_not_swallowed(cudnn8, cudnn8_
     assert ok is False
     # The message is the only thing standing between the user and a silent
     # restart loop, so it must name the library and a way out.
-    assert "cudnn_ops_infer" in reason
+    assert "cudnn" in reason and "cuBLAS 12" in reason
     assert "pytorch-whisper" in reason
 
 
@@ -111,7 +111,7 @@ def test_hosts_that_never_need_cudnn8_are_not_disqualified(monkeypatch, cudnn8, 
     monkeypatch.setattr(cudnn8, "_torch_wants_cudnn8", lambda: verdict)
 
     def _boom(*a, **kw):
-        raise AssertionError("probed for cuDNN 8 on a host that does not need it")
+        raise AssertionError("probed for cuDNN 9 on a host that does not need it")
 
     monkeypatch.setattr(cudnn8, "_try_load", _boom)
     ok, reason = cudnn8.ctranslate2_cudnn_status()
@@ -143,7 +143,7 @@ def test_ctranslate2_engines_report_unavailable(engine, ab, cudnn8_missing, ctra
     model. That is precisely why the failure landed as a process kill."""
     ok, reason = getattr(ab, engine).is_available()
     assert ok is False
-    assert "cudnn_ops_infer" in reason
+    assert "cudnn" in reason and "cuBLAS 12" in reason
 
 
 def test_auto_detect_falls_back_to_pytorch_whisper(
@@ -163,7 +163,7 @@ def test_the_isolated_sidecar_engine_reports_the_same_reason(cudnn8_missing, ctr
 
     ok, reason = subprocess_asr.IsolatedFasterWhisperBackend.is_available()
     assert ok is False
-    assert "cudnn_ops_infer" in reason
+    assert "cudnn" in reason and "cuBLAS 12" in reason
 
 
 def test_a_broken_probe_never_blocks_asr(monkeypatch, ab, cudnn8, ctranslate2_importable):
@@ -186,7 +186,7 @@ def test_compat_dirs_covers_the_running_interpreter(cudnn8):
     process died anyway."""
     dirs = cudnn8.compat_dirs()
     assert any(d.startswith(sys.prefix) for d in dirs), dirs
-    assert all("cudnn8_compat" in d for d in dirs)
+    assert all("ctranslate2_cuda12" in d for d in dirs)
 
 
 def test_the_asr_sidecar_preloads_cudnn8(monkeypatch, ab, cudnn8):
@@ -207,7 +207,7 @@ def test_the_asr_sidecar_preloads_cudnn8(monkeypatch, ab, cudnn8):
         spec.loader.exec_module(module)
     finally:
         sys.path[:] = saved
-    assert called, "the sidecar did not preload cuDNN 8 on startup"
+    assert called, "the sidecar did not preload cuDNN 9 on startup"
 
 
 def test_the_windows_dll_directory_handle_is_retained(monkeypatch, tmp_path, cudnn8):

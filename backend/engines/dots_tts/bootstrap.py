@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from engines._venv_probe import ProbeResult, log_safe, venv_can_import
+from engines.native_compat import bootstrap_args as native_install_args
 
 logger = logging.getLogger("omnivoice.dots_tts.bootstrap")
 
@@ -217,7 +218,7 @@ def _bootstrap_engines_venv(clone_dir: Path) -> Path:
     install_cmd = [
         uv, "pip", "install",
         "--python", str(python_path),
-        "-e", str(clone_dir),
+        "-e", str(clone_dir), *native_install_args("dots-tts"),
     ]
     # Apply the upstream pin set when it ships with the clone.
     constraints = clone_dir / "constraints" / "recommended.txt"

@@ -14,7 +14,7 @@ two cannot drift apart again. ``tests/test_sidecar_install.py`` pins the URL
 to the ``pytorch-cuda`` index declared in the app's ``pyproject.toml``.
 """
 
-PYTORCH_CU128_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+PYTORCH_CUDA_INDEX_URL = "https://download.pytorch.org/whl/cu130"
 
 # `unsafe-best-match`: the PyTorch index also mirrors common dependencies
 # (numpy, pillow, sympy, …) at a narrower range of versions than PyPI. uv's
@@ -22,9 +22,9 @@ PYTORCH_CU128_INDEX_URL = "https://download.pytorch.org/whl/cu128"
 # and could pin an old mirror copy or fail outright. The index is PyTorch's
 # official one, so the dependency-confusion risk the name warns about does not
 # apply to it.
-UV_PIP_CU128_ARGS: tuple[str, ...] = (
+UV_PIP_CUDA_ARGS: tuple[str, ...] = (
     "--extra-index-url",
-    PYTORCH_CU128_INDEX_URL,
+    PYTORCH_CUDA_INDEX_URL,
     "--index-strategy",
     "unsafe-best-match",
 )
@@ -52,8 +52,8 @@ UV_PIP_CPU_ARGS: tuple[str, ...] = (
 # enforces it against `pyproject.toml`'s constraint pins.
 # torchvision is deliberately absent: no sidecar declares it, and shipping it
 # would add ~200 MB of wheels an engine never imports.
-PYTORCH_ROCM_INDEX_URL = "https://download.pytorch.org/whl/rocm6.4"
-ROCM_TORCH_PINS: tuple[str, ...] = ("torch==2.8.0", "torchaudio==2.8.0")
+PYTORCH_ROCM_INDEX_URL = "https://download.pytorch.org/whl/rocm7.1"
+ROCM_TORCH_PINS: tuple[str, ...] = ("torch==2.13.0", "torchaudio==2.11.0")
 
 UV_PIP_ROCM_ARGS: tuple[str, ...] = (
     "--extra-index-url",
@@ -61,3 +61,7 @@ UV_PIP_ROCM_ARGS: tuple[str, ...] = (
     "--index-strategy",
     "unsafe-best-match",
 )
+
+# Compatibility names for callers that imported the historical constant.
+PYTORCH_CU128_INDEX_URL = PYTORCH_CUDA_INDEX_URL
+UV_PIP_CU128_ARGS = UV_PIP_CUDA_ARGS

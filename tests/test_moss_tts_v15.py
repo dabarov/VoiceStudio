@@ -244,6 +244,7 @@ def test_loader_device_matches_routing(monkeypatch, family, legacy, probe_raises
     ))
     monkeypatch.setattr(main, '_state', None)
     monkeypatch.setattr(main, '_model_source', lambda: ('local-fixture', 'a' * 40))
+    monkeypatch.setattr(main, '_snapshot_path', lambda repo, revision: '/snapshots/' + revision)
     state = main._load_model(io.BytesIO())
     if not legacy:
         accelerator.assert_called_once_with(check_available=True)
@@ -270,8 +271,13 @@ def test_bootstrap_install_names_the_pytorch_cuda_index(monkeypatch, tmp_path):
     """#2015: the [torch-runtime] extra pins torch==2.9.1+cu128, which exists
     only on PyTorch's index — without it the install could never resolve."""
     from core.torch_indexes import UV_PIP_CU128_ARGS
+    from core import device_caps
+    from engines import native_compat
     from engines.moss_tts_v15 import bootstrap
+    from types import SimpleNamespace
 
+    monkeypatch.setattr(native_compat.sys, "platform", "linux")
+    monkeypatch.setattr(device_caps, "detect_host_caps", lambda: SimpleNamespace(family="cuda"))
     ran = []
     monkeypatch.setattr(bootstrap, "_ENGINES_VENV_DIR", tmp_path / ".venv")
     monkeypatch.setattr(bootstrap, "_locate_uv", lambda: "/fake/uv")

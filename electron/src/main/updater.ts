@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { isTrustedRenderer } from './trusted-renderer';
 import type { UpdateReleaseInfo, UpdateState } from '../preload/index.d';
 import { sendToLiveWindow } from './window-safety';
+import { DESKTOP_UPDATES_ENABLED } from '../../../config/app-config.mjs';
 
 // electron-updater is CommonJS. Electron executes our main bundle as ESM, so
 // named runtime imports fail before the app can create a window.
@@ -44,6 +45,7 @@ export const UPDATE_CHANNELS = {
 export async function listDesktopReleases(
   fetcher: typeof fetch = fetch,
 ): Promise<UpdateReleaseInfo[]> {
+  if (!DESKTOP_UPDATES_ENABLED) return [];
   const response = await fetcher(RELEASES_API, {
     headers: {
       Accept: 'application/vnd.github+json',
@@ -101,9 +103,11 @@ export function forgetSavedUpdateChannel(userData: string = app.getPath('userDat
   }
 }
 
-/** Packaged builds update in-app unless a package manager owns the install. */
+/** Only builds that explicitly trust the upstream feed can update in-app. */
 function updatesSupported(): boolean {
-  return app.isPackaged && process.env.VOICESTUDIO_DISABLE_UPDATER !== '1';
+  return (
+    DESKTOP_UPDATES_ENABLED && app.isPackaged && process.env.VOICESTUDIO_DISABLE_UPDATER !== '1'
+  );
 }
 
 export class DesktopUpdater {

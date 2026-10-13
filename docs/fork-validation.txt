@@ -1,0 +1,83 @@
+VoiceStudio fork validation — 2026-10-13
+
+Upstream base: 2fb9bf23e42da002de1fab61e661066e956365f1
+Fork: https://github.com/dabarov/VoiceStudio
+Branch: security/local-hardening
+Review: https://github.com/dabarov/VoiceStudio/pull/1 (draft, not merged)
+Host: Apple Silicon macOS; Node 22.23.3, Bun 1.4.2, uv 0.12.13, Python 3.11.
+
+TEST RESULTS
+- Full backend suite: 9,543 passed, 63 skipped, 2 expected failures,
+  7 non-strict unexpected passes, 6 subtests passed. Process exited normally.
+- Separate backend session suite: 510 passed.
+- Final installer/source/driver selection: 286 passed, 7 skipped. A subsequent
+  duplicate-option fix in the AMD installer passed 172 targeted tests; its new
+  regression failed before the fix. The full suite was already in progress
+  when this last change was made.
+- Electron/shared suites: 4,346 passed, 2 skipped. TypeScript checks passed.
+  Final CPU/ARM installer changes also passed 53 targeted tests, 2 skipped.
+- Frontend/script suite: 109 passed.
+- Native Rust helper: 33 tests passed; release helper built successfully.
+- Web/Electron production builds and packaging contract passed.
+- Python tests ran with HF_HUB_OFFLINE=1 and separate empty Hub cache paths.
+  Existing warnings include deprecated APIs and non-strict xpass markers.
+
+REAL COMPATIBILITY CHECKS
+- Native Torch 2.13.0 / TorchAudio 2.11.0 / TorchVision 0.28.0 imported.
+  Real WAV reads/writes/crops/resampling, tensor convolution and NMS passed.
+- The actual bundled WhisperX VAD checkpoint loaded and inferred on a synthetic
+  tone on CPU. No TTS voice/model weights were downloaded for these tests.
+- All eight managed Torch engine dependency sets resolved with security
+  overrides on macOS; IndexTTS's Linux CPU manifest also resolved.
+- Pinned IndexTTS 2.5 and Nano runtime imports passed. IndexTTS custom GPT-2
+  forward inference and cached decoding passed on real tensors.
+- Legacy Transformers security tests: 13 passed/2 skipped on 4.52.4;
+  14 passed/1 skipped on each of 4.57.6 and 5.0.0. The relevant attack
+  regressions failed against original upstream wheels before backporting.
+- Accelerate, Stanza, NLTK, braces and sprintf-js security regressions reproduced
+  the original failures and passed with the fixes. Local wheel hashes, RECORD
+  entries, exact retained licence bytes and packaged resources were checked.
+- Real backend start/stop smoke: /health, /sysinfo and /engines returned 200;
+  MPS was detected and shutdown exited normally.
+
+DEPENDENCY AUDITS
+- Main lock plus all shipped local wheels: 313 public package/version queries.
+  Remaining OSV matches are the six backported upstream versions: Accelerate,
+  Stanza, NLTK and the three legacy Transformers families. The audit deliberately
+  reports these instead of hiding advisories behind local version suffixes.
+- Eight optional engine resolutions: 300 unique package/version queries; only
+  the corresponding locally patched upstream versions matched advisories.
+- Rust lock: 346 registry packages queried after quinn-proto was updated to
+  0.11.18; no OSV matches returned. These are database results at review time,
+  not a guarantee against unknown/future vulnerabilities.
+- Fork GitHub Actions did not report remote checks; the above are local results.
+
+INSTALLATION
+- Built and installed /Applications/VoiceStudio.app (0.5.7, same canonical
+  version as upstream; automatic upstream updates disabled).
+- Locally ad-hoc signed; codesign --verify --deep --strict passed. This is not
+  Apple Developer ID signing or notarization. No system security protection
+  was disabled.
+- The app completed its normal frozen first-run runtime installation. Installed
+  metadata confirms the patched native stack, all main security backports,
+  pyannote/WhisperX compatibility wheels and the audio adapter.
+- Restarted after the final installer correction; both the app bundle and the
+  managed runtime contain the reviewed backend source. /health, /sysinfo and
+  /engines returned 200 after restart, and the UI showed Engine ready. Only
+  127.0.0.1:3900 was listening for this backend.
+- Starter models completed installation: k2-fsa/OmniVoice,
+  Systran/faster-whisper-base and csukuangfj/sherpa-onnx-whisper-tiny. No active
+  downloads remained. Voice generation displayed a model-licence acceptance
+  requirement; no licence was accepted on the user's behalf and no TTS output
+  is claimed in this validation.
+
+LIMITATIONS
+- No complete TTS synthesis across every engine, voice-cloning quality test,
+  or Windows/Linux CUDA/ROCm execution. Keeping an engine available and resolving
+  its dependencies is not equivalent to validating every model and accelerator.
+- Pins prevent unreviewed upstream code changes; downloaded Python is not a
+  sandbox. Optional translation agents still run with the user's OS privileges.
+- User-owned engine environments are not silently rewritten and retain their
+  own security status. Use the fork's managed installation/repair paths.
+- No claim of zero vulnerabilities, universal model compatibility or model
+  commercial-use clearance. Model download/access terms remain separate.

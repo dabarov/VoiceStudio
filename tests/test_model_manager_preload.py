@@ -145,3 +145,8 @@ def test_preload_warms_up_locally_installed_checkpoint(model_manager, monkeypatc
     asyncio.run(model_manager.preload_model())
 
     assert model_manager.model is loaded
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

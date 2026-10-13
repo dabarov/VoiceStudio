@@ -119,6 +119,14 @@ def venv_can_import(
     interpreter misbehaved.
     """
     timeout = probe_timeout_s(engine)
+    # User-owned older environments need no adapter. New managed environments
+    # carry it and must activate it before importing the upstream engine.
+    import_stmt = (
+        "import importlib.util\n"
+        "if importlib.util.find_spec('voicestudio_audio_compat') is not None:\n"
+        "    from voicestudio_audio_compat import activate\n"
+        "    activate()\n" + import_stmt
+    )
     try:
         proc = subprocess.run(
             [str(python_path), "-c", import_stmt],

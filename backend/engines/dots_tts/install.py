@@ -12,6 +12,9 @@ def compatible_constraints(source: Path) -> Path:
     text = source.read_text(encoding="utf-8")
     patched = text
     for package, old, new in (
+        ("torch", "2.8.0", "2.13.0"),
+        ("torchaudio", "2.8.0", "2.11.0"),
+        ("accelerate", "1.12.0", "1.14.0+voicestudio.1"),
         ("gradio", "6.17.0", "6.17.3"),
         ("transformers", "4.57.0", "4.57.1"),
     ):

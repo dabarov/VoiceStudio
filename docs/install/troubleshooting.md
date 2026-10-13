@@ -129,28 +129,14 @@ retry.
 'pkg_resources'` during WhisperX import, and the app never advances past the
 "Setting up models" step.
 
-**Cause:** WhisperX (and a couple of its transitive deps) still imports
-`pkg_resources`, which `setuptools >= 80` dropped. `pyproject.toml` pins
-`setuptools>=75,<80` so it stays present — but the venv can still lose it two
-other ways: **(a)** antivirus (commonly Windows Defender) quarantines
-`pkg_resources`' files, or **(b)** a partial/interrupted extract. In both cases
-setuptools' *metadata* remains, so `uv`/`pip` report it "already satisfied" and
-a plain install **no-ops** — the files are never restored.
+**In this fork:** the locked speech packages no longer directly import
+`pkg_resources`, and setuptools is kept at 83 or newer for its security fix.
+This error indicates an older or incompatible package in the environment.
 
-**Fix:** in the backend venv, **force a reinstall** (a plain install won't work
-for the reasons above):
-
-```
-uv pip install --reinstall 'setuptools>=75,<80'
-```
-
-then restart. If it recurs, your antivirus is removing the files again — add the
-backend **`.venv`** folder to its exclusions (Windows Security → Virus & threat
-protection → Exclusions). The app's auto-repair now uses `--reinstall` too, so a
-fresh install heals itself.
-
-**Linked issues:** [#58](https://github.com/debpalash/VoiceStudio/issues/58),
-[#248](https://github.com/debpalash/VoiceStudio/issues/248)
+Repair the backend from this fork's locked dependencies (the desktop setup/repair
+flow, or `uv sync --frozen` from the fork checkout), then restart. Do not downgrade
+setuptools below 83 to restore this removed API. An optional engine that still
+needs it requires its own compatibility update before use.
 
 ### 1a. Model load fails: `[Errno 2] No such file or directory: '…/transformers/…/modeling_*.py'`
 
@@ -192,7 +178,7 @@ unpinned reinstall can itself resolve a drifted pair
 ([#1357](https://github.com/debpalash/VoiceStudio/issues/1357)):
 
 ```
-uv pip install --python .venv --reinstall torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 transformers
+uv pip install --python .venv --reinstall torch==2.13.0 torchaudio==2.11.0 torchvision==0.28.0 transformers
 ```
 
 run in the project folder. The versions mirror `deploy/torch-constraints.txt`

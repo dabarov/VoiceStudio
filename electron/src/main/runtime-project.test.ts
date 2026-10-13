@@ -9,7 +9,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import {
   installRuntime,
   promoteLegacyRuntimeCaches,
-  CUDNN8_COMPAT_PIN,
+  CUDNN_COMPAT_PINS,
   ROCM_TORCH_INDEX,
   ROCM_TORCH_PINS,
   rocmTorchOptIn,
@@ -41,6 +41,8 @@ async function fixture() {
   await mkdir(join(bundle, 'config'), { recursive: true });
   await mkdir(join(bundle, 'frontend', 'dist'), { recursive: true });
   await mkdir(join(bundle, 'omnivoice'));
+  await mkdir(join(bundle, 'vendor', 'python', 'wheels'), { recursive: true });
+  await writeFile(join(bundle, 'vendor', 'python', 'wheels', 'patched.whl'), 'patched dependency');
   for (const file of [
     'pyproject.toml',
     'uv.lock',
@@ -494,6 +496,7 @@ describe('packaged runtime setup', () => {
     expect(existsSync(join(project, 'frontend'))).toBe(false);
     expect(existsSync(join(project, 'backend', 'main.py'))).toBe(true);
     expect(await readFile(join(project, 'config', 'app.json'), 'utf8')).toBe('config/app.json');
+    expect(await readFile(join(project, 'vendor', 'python', 'wheels', 'patched.whl'), 'utf8')).toBe('patched dependency');
   });
   it('replaces obsolete bundled modules without removing the interpreter or user files', async () => {
     const { bundle, project } = await fixture();
@@ -576,7 +579,7 @@ describe('packaged runtime setup', () => {
     expect(run.mock.calls[0]?.[0]).toBe(executable);
   });
   it.skipIf(process.platform === 'darwin')(
-    'installs and validates cuDNN 8 compatibility on a CUDA runtime',
+    'installs and validates cuDNN 9 / cuBLAS 12 compatibility on a CUDA runtime',
     async () => {
       const { bundle, project } = await fixture();
       const sitePackages = join(project, '.venv', 'Lib', 'site-packages');
@@ -588,20 +591,25 @@ describe('packaged runtime setup', () => {
         if (args[0] === 'pip') {
           const libDir = join(
             sitePackages,
-            'cudnn8_compat',
+            'ctranslate2_cuda12',
             'nvidia',
             'cudnn',
             process.platform === 'win32' ? 'bin' : 'lib',
           );
           await mkdir(libDir, { recursive: true });
+          const blasDir = join(sitePackages, 'ctranslate2_cuda12', 'nvidia', 'cublas', process.platform === 'win32' ? 'bin' : 'lib');
+          await mkdir(blasDir, { recursive: true });
+          for (const name of process.platform === 'win32' ? ['cublas64_12.dll', 'cublasLt64_12.dll'] : ['libcublas.so.12', 'libcublasLt.so.12']) {
+            await writeFile(join(blasDir, name), 'library');
+          }
           await Promise.all(
             Array.from({ length: 5 }, (_, index) =>
               writeFile(
                 join(
                   libDir,
                   process.platform === 'win32'
-                    ? `cudnn-${index}64_8.dll`
-                    : `libcudnn-${index}.so.8`,
+                    ? `cudnn-${index}64_9.dll`
+                    : `libcudnn-${index}.so.9`,
                 ),
                 'library',
               ),
@@ -620,8 +628,8 @@ describe('packaged runtime setup', () => {
         'global',
       );
       const compatInstall = run.mock.calls.find(([, args]) => args[0] === 'pip');
-      expect(compatInstall?.[1]).toContain(CUDNN8_COMPAT_PIN);
-      expect(compatInstall?.[1]).toContain(join(sitePackages, 'cudnn8_compat'));
+      for (const pin of CUDNN_COMPAT_PINS) expect(compatInstall?.[1]).toContain(pin);
+      expect(compatInstall?.[1]).toContain(join(sitePackages, 'ctranslate2_cuda12'));
       expect(await runtimeReady(bundle, project)).toBe(true);
     },
   );

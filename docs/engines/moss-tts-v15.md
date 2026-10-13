@@ -48,51 +48,15 @@ MOSS-TTS-v1.5 is **not** bundled (the model is large and the package pins a
 conflicting `transformers`). VoiceStudio ships a sidecar runner that loads it
 into an isolated venv on demand.
 
-1. Clone the MOSS-TTS repo on disk:
+Use **Model Catalogue → Engines → MOSS-TTS-v1.5 → Install** in this fork.
+The managed installer pins its source checkout, uses PyTorch 2.13.0 and
+TorchAudio 2.11.0, and installs our security-backported Transformers 5.0.0
+wheel. Its audio adapter preserves the older file-I/O API. The approximately
+16 GB model download remains an explicit model-use/install action.
 
-   ```bash
-   git clone https://github.com/OpenMOSS/MOSS-TTS.git
-   ```
-
-2. Install the editable package into a fresh venv. Use
-   `uv pip install -e ".[torch-runtime]"` — **never** `uv sync --all-extras`,
-   which would overwrite VoiceStudio's lock file with `transformers==5.0` and
-   break the parent process. The `torch-runtime` extra is CUDA (`+cu128`):
-
-   ```bash
-   cd MOSS-TTS
-   uv venv .venv
-   uv pip install -e ".[torch-runtime]"      --extra-index-url https://download.pytorch.org/whl/cu128      --index-strategy unsafe-best-match
-   ```
-
-   The extra pins `torch==2.9.1+cu128`, which is published only on PyTorch's
-   own index, so the `--extra-index-url` is required — without it uv reports
-   the requirements as unsatisfiable on every host.
-
-   On a **non-CUDA / CPU host** (e.g. Apple Silicon), install plain
-   `torch`/`torchaudio`/`transformers==5.0.0` into the venv instead of the
-   `+cu128` extra (the auto-bootstrap below only targets CUDA hosts).
-
-3. The ~16 GB weights download from HuggingFace on first synthesize. The
-   parent forwards `HF_HOME` / `HF_HUB_CACHE` to the sidecar so the cache is
-   shared with the rest of VoiceStudio's downloads.
-
-4. Set `OMNIVOICE_MOSS_TTS_V15_DIR` to the repo root (the directory that
-   contains `pyproject.toml`):
-
-   ```bash
-   # macOS / Linux
-   echo 'export OMNIVOICE_MOSS_TTS_V15_DIR=$HOME/code/MOSS-TTS' >> ~/.zshrc
-   source ~/.zshrc
-   ```
-
-   ```powershell
-   # Windows PowerShell
-   [Environment]::SetEnvironmentVariable("OMNIVOICE_MOSS_TTS_V15_DIR","$env:USERPROFILE\code\MOSS-TTS","User")
-   ```
-
-5. Restart VoiceStudio. MOSS-TTS-v1.5 appears in **Model Catalogue** with
-   `available: true` and `isolation_mode: subprocess`.
+For a source checkout, use the app's managed installer or its bootstrap. Plain
+upstream install commands omit this fork's security backports. Custom existing
+venvs are reused without alteration and are not certified by the fork's audit.
 
 ## Venv resolution order
 
@@ -107,8 +71,8 @@ order (see `backend/engines/moss_tts_v15/bootstrap.py`):
 3. **Lazy bootstrap** — if neither venv exists, VoiceStudio runs `uv venv`
    then `uv pip install --python <python> -e "${DIR}[torch-runtime]"`.
    Requires `OMNIVOICE_MOSS_TTS_V15_DIR`; raises a clear error otherwise.
-   On a non-CUDA host the `+cu128` extra cannot resolve — set the venv up
-   manually per step 2.
+   The fork also passes its native and Transformers override files, local wheel
+   directory and audio adapter; these replace the upstream CUDA-only pins.
 
 ## Voice cloning
 
@@ -129,14 +93,23 @@ default voice. `duration` (seconds) maps to MOSS's `tokens` argument at
 
 ## Common errors
 
+This security fork resolves the built-in model at
+`cdd3b911b1585e3f2dbc7775ef10f9926f58850a` and its audio codec independently
+at `3cd226ba2947efa357ef453bcad111b6eafba782`. Both loaders receive local
+snapshot paths. A model's commit is never used as the codec's revision.
+Custom model overrides must be Hub repository names with the trust setting
+and immutable commit above; local-directory overrides are rejected.
+
 ### `MOSS-TTS-v1.5 venv not found. Set OMNIVOICE_MOSS_TTS_V15_DIR ...`
 
 You haven't pointed VoiceStudio at a MOSS-TTS clone yet. Follow **Install**.
 
-### `uv pip install -e failed ... '[torch-runtime]' extra (cu128) cannot resolve`
+### Older manual environment reports incompatible dependencies
 
-You're on a non-CUDA host. The upstream `torch-runtime` extra is CUDA-only;
-set up the venv manually with plain `torch`/`transformers==5.0.0` (step 2).
+Use the managed engine's repair action. Preserve model weights and the source
+checkout, and let the installer refresh the dependency environment with the
+fork's versioned recipe. User-owned environments need the same overrides from
+`backend/config/` and wheels from `vendor/python/wheels/`.
 
 ## License
 

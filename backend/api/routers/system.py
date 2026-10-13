@@ -849,7 +849,12 @@ def get_sys_info():
         gpu_active = gpu_active or gpu_utilization > 0 or vram > 0.01
 
     vm = psutil.virtual_memory()
-    cpu_frequency = psutil.cpu_freq()
+    try:
+        cpu_frequency = psutil.cpu_freq()
+    except (OSError, RuntimeError, SystemError, NotImplementedError):
+        # Some Apple Silicon kernels expose no usable frequency counter.
+        # Optional telemetry must not take the whole system-status route down.
+        cpu_frequency = None
     return {
         "cpu": psutil.cpu_percent(interval=None),
         "cpu_model": _CPU_MODEL,

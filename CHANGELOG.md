@@ -8,6 +8,20 @@ metadata and the backend fallback mirror it.
 
 ## [Unreleased]
 
+**Highlights**
+
+- Preserve voice engines while upgrading the native runtime and adapting legacy audio APIs. (#1)
+- This security fork protects model download bounds, isolates translation environments, and disables upstream installers. (#1)
+
+### Fixed
+
+- MOSS models and audio codecs use separate immutable revisions, with explicit trust and revision checks for custom code. (#1)
+- Dependency updates and maintained backports reject unsafe checkpoints and model paths while preserving current translation requirements. (#1)
+- Desktop setup, Docker and Colab include the patched libraries, and security scans keep their upstream advisory history visible. (#1)
+- Oversized download responses are rejected before overwriting completed model data or exceeding the known file size. (#1)
+- Translation agents no longer inherit studio credentials or OpenCode configuration overrides. (#1)
+- Fork builds disable upstream update checks, feeds, and AppImage update metadata so updates cannot replace these patches. (#1)
+
 ## [0.5.7] — 2026-10-12
 
 **VoiceStudio now runs on PCs without a GPU and recovers instead of giving up.** Voice cloning uses the speech-to-text model you installed from Model Catalogue, GPU-less computers get the small CPU PyTorch build, and slow or busy backends are no longer reported as failed.

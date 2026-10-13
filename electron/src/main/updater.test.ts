@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
     quitAndInstall: vi.fn(),
   };
   return {
+    updatesEnabled: true,
     app: {
       isPackaged: true,
       getVersion: vi.fn(() => '0.5.2'),
@@ -59,6 +60,12 @@ vi.mock('node:fs', () => ({ ...mocks.fs, default: mocks.fs }));
 
 vi.mock('./trusted-renderer', () => ({ isTrustedRenderer: mocks.trusted }));
 
+vi.mock('../../../config/app-config.mjs', () => ({
+  get DESKTOP_UPDATES_ENABLED() {
+    return mocks.updatesEnabled;
+  },
+}));
+
 import {
   DesktopUpdater,
   feedManifestName,
@@ -77,6 +84,7 @@ describe('DesktopUpdater', () => {
     mocks.ipcHandlers.clear();
     mocks.disk.channel = undefined;
     mocks.app.isPackaged = true;
+    mocks.updatesEnabled = true;
     mocks.autoUpdater.autoDownload = true;
     mocks.autoUpdater.autoInstallOnAppQuit = true;
     mocks.autoUpdater.allowDowngrade = true;
@@ -86,6 +94,28 @@ describe('DesktopUpdater', () => {
     mocks.autoUpdater.checkForUpdates.mockResolvedValue(undefined);
     mocks.autoUpdater.downloadUpdate.mockResolvedValue(undefined);
     mocks.trusted.mockReturnValue(true);
+  });
+
+  test('a fork build cannot contact or install upstream updates, even with the env switch cleared', async () => {
+    mocks.updatesEnabled = false;
+    vi.stubEnv('VOICESTUDIO_DISABLE_UPDATER', '0');
+    const fetcher = vi.fn();
+    try {
+      const updater = new DesktopUpdater();
+      expect(updater.snapshot().status).toBe('unsupported');
+      await updater.check();
+      await updater.download();
+      updater.install();
+      expect(await listDesktopReleases(fetcher)).toEqual([]);
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(mocks.autoUpdater.on).not.toHaveBeenCalled();
+      expect(mocks.autoUpdater.setFeedURL).not.toHaveBeenCalled();
+      expect(mocks.autoUpdater.checkForUpdates).not.toHaveBeenCalled();
+      expect(mocks.autoUpdater.downloadUpdate).not.toHaveBeenCalled();
+      expect(mocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   test('configures the stable platform feed and follows updater lifecycle events', () => {

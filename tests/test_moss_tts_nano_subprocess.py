@@ -20,6 +20,11 @@ _MAIN = Path(__file__).resolve().parents[1] / "backend/engines/moss_tts_nano_sub
 
 
 def _load_sidecar(monkeypatch, calls, *, sample_rate=48000, channels=2, samples=960):
+    import huggingface_hub
+    def snapshot(repo, **kw):
+        calls.append(("snapshot", (repo, kw)))
+        return "/snapshots/" + kw["revision"]
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", snapshot)
     class NanoTTSService:
         def __init__(self, **kw):
             calls.append(("init", kw))
@@ -66,8 +71,10 @@ def test_drives_upstreams_runtime_and_downmixes_to_mono(monkeypatch):
     sidecar._handle_synthesize({"op": "synthesize", "text": "hello"}, out)
 
     init = dict(calls)["init"]
-    assert init["checkpoint_path"] == "OpenMOSS-Team/MOSS-TTS-Nano"
-    assert init["audio_tokenizer_path"] == "OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano"
+    assert init["checkpoint_path"] == "/snapshots/44502f80dbf9743528fa921cc544d662c685ebec"
+    assert init["audio_tokenizer_path"] == "/snapshots/6aa02b01e445cc585582cf0ba480bc3ea6c8dd68"
+    snapshots = [value for name, value in calls if name == "snapshot"]
+    assert all(value[1]["local_files_only"] for value in snapshots)
     assert ("preload", {"load_model": True}) in calls
     synth = dict(calls)["synthesize"]
     assert synth["text"] == "hello"

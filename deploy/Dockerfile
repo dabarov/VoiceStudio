@@ -1,10 +1,10 @@
 # Base image for the Python/PyTorch runtime stage. The default builds the
 # CUDA variant; CI also builds a ROCm/AMD variant (issue #1165) by overriding:
-#   BASE_IMAGE=rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.8.0
+#   BASE_IMAGE=rocm/pytorch:rocm10.0_ubuntu24.04_py3.12_pytorch_release_2.13.0
 #   GPU_FLAVOR=rocm
-# Both bases ship torch/torchaudio 2.8.0 preinstalled; the dependency install
+# Both bases ship patched torch 2.13.0 preinstalled; the dependency install
 # below deliberately preserves them (see the GPU_FLAVOR guard).
-ARG BASE_IMAGE=pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+ARG BASE_IMAGE=pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime@sha256:db80a41f8428644cebcb3d75b0b62df334ab6c0e75785951eb25f48bfbd42407
 
 # ==========================================
 # Builder Stage: Compile React Frontend
@@ -18,6 +18,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY electron/package.json ./electron/
 COPY config/ ./config/
+COPY patches/ ./patches/
 
 RUN bun install --frozen-lockfile
 
@@ -70,6 +71,7 @@ RUN python3 -m pip install --no-cache-dir uv
 # Copy python packaging specs (README.md required by hatchling metadata)
 COPY pyproject.toml uv.lock README.md ./
 COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
+COPY vendor/python/wheels/ ./vendor/python/wheels/
 
 # Install the project (non-editable — no need for -e in containers).
 # Uses `uv` for exponentially faster resolution than plain pip.
@@ -81,7 +83,7 @@ COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
 #
 # NOTE: `uv pip install` (without --upgrade) keeps already-installed packages
 # that satisfy the requirements, so the base image's GPU-built torch/torchaudio
-# (2.8.0, satisfying our `torch>=2.4`) survive this step instead of being
+# (2.13.0, satisfying our security floor) survive this step instead of being
 # clobbered by PyPI's CUDA-default wheels. That property is what makes the
 # ROCm variant possible at all — the guard below pins it down.
 #
@@ -89,10 +91,10 @@ COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
 # constraint-dependencies` (that is a project-API setting), so without it the
 # trio resolves on its bare lower bounds and torch may move while torchvision
 # stays put — an ABI mismatch at import (#1357). The pins carry no local
-# segment, so they match the base image's +cu128 / +rocm6.4 builds rather than
+# segment, so they match the base image's +cu130 / +rocm10.0 builds rather than
 # replacing them.
 RUN uv pip install --python "$(command -v python3)" --no-cache \
-    --constraint deploy/torch-constraints.txt .
+    --constraint deploy/torch-constraints.txt --override deploy/torch-constraints.txt --find-links vendor/python/wheels .
 
 # Guard (fails the build, not the user at runtime): assert the dependency
 # install did NOT replace the base image's GPU torch. A future dep bump that
@@ -107,25 +109,26 @@ RUN python3 -c "import os, torch, torchaudio, torchvision; \
     import torchvision.ops; torchvision.ops.nms; \
     print('torchvision C++ ops resolve against this torch')"
 
-# CTranslate2 (WhisperX, faster-whisper) links cuDNN 8, but the CUDA base image
-# ships cuDNN 9, so libcudnn_ops_infer.so.8 is absent and loading it aborts the
-# backend process outright rather than raising (#1371). scripts/setup.py
-# side-loads the cuDNN 8 libraries for source installs; the image needs the same
+# CTranslate2 (WhisperX, faster-whisper) links CUDA 12's cuDNN 9 / cuBLAS 12,
+# while the base image supplies CUDA 13 libraries. Missing native libraries
+# can abort the backend process outright rather than raising. scripts/setup.py
+# side-loads the cuDNN 9 / cuBLAS 12 libraries for source installs; the image needs the same
 # shim or Docker users lose every CTranslate2 ASR engine (#2050).
 #
 # The target is derived from sys.prefix rather than hardcoded: backend/core/
-# cudnn8.py looks for <sys.prefix>/lib/pythonX.Y/site-packages/cudnn8_compat,
+# cudnn8.py looks for <sys.prefix>/lib/pythonX.Y/site-packages/ctranslate2_cuda12,
 # and sys.prefix differs between the conda-based CUDA image and the ROCm venv.
-# --no-deps keeps this to the cuDNN wheels alone, leaving the base image's torch
+# --no-deps installs just these two wheels, leaving the base image's torch
 # stack untouched. Skipped for ROCm, which does not use cuDNN.
 RUN if [ "$GPU_FLAVOR" = "cuda" ]; then \
-      target="$(python3 -c "import os, sys; print(os.path.join(sys.prefix, 'lib', 'python%d.%d' % sys.version_info[:2], 'site-packages', 'cudnn8_compat'))")" && \
+      target="$(python3 -c "import os, sys; print(os.path.join(sys.prefix, 'lib', 'python%d.%d' % sys.version_info[:2], 'site-packages', 'ctranslate2_cuda12'))")" && \
       uv pip install --python "$(command -v python3)" --no-cache --no-deps \
-        --target "$target" nvidia-cudnn-cu12==8.9.7.29 && \
-      python3 -c "import os, sys; d = os.path.join(sys.prefix, 'lib', 'python%d.%d' % sys.version_info[:2], 'site-packages', 'cudnn8_compat', 'nvidia', 'cudnn', 'lib'); \
-        libs = [f for f in os.listdir(d) if '.so.8' in f]; \
-        assert libs, 'cudnn8_compat installed but no .so.8 libraries in ' + d; \
-        print('cuDNN 8 compat libraries: %d' % len(libs))"; \
+        --target "$target" nvidia-cudnn-cu12==9.20.0.48 nvidia-cublas-cu12==12.9.1.4 && \
+      python3 -c "import os, sys; root = os.path.join(sys.prefix, 'lib', 'python%d.%d' % sys.version_info[:2], 'site-packages', 'ctranslate2_cuda12', 'nvidia'); \
+        d = os.path.join(root, 'cudnn', 'lib'); libs = [f for f in os.listdir(d) if '.so.9' in f]; \
+        assert len(libs) >= 5, 'Incomplete cuDNN 9 libraries in ' + d; \
+        assert all(os.path.isfile(os.path.join(root, 'cublas', 'lib', n)) for n in ('libcublas.so.12', 'libcublasLt.so.12')), 'Incomplete cuBLAS 12 libraries'; \
+        print('cuDNN 9 / cuBLAS 12 compat libraries: %d' % len(libs))"; \
     fi
 
 # Copy application source

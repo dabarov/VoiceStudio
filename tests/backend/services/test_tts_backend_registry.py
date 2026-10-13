@@ -273,7 +273,7 @@ def test_curated_models_not_present_on_other_backends(registry_sandbox):
         assert "active_model_id" not in entry
 
 
-def test_isolation_mode_in_process_vs_subprocess(registry_sandbox):
+def test_isolation_mode_in_process_vs_subprocess(registry_sandbox, in_process_omnivoice_host):
     """SubprocessBackend subclasses get isolation_mode='subprocess'; others 'in-process'."""
     registry_sandbox["fake-sub"] = FakeSubBackend
     registry_sandbox["healthy-inproc"] = HealthyInProcessBackend

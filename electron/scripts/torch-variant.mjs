@@ -73,9 +73,9 @@ export async function selectTorchVariant({
   // ROCm is Linux-only; match the packaged install's Windows fallback.
   if (requested === 'rocm' && platform === 'linux') return 'rocm';
   const cpuWheelsApply =
-    (platform === 'linux' && arch === 'x64') ||
+    (platform === 'linux' && (arch === 'x64' || arch === 'arm64')) ||
     (platform === 'win32' && (arch === 'x64' || arch === 'arm64'));
-  // Linux ARM keeps the lock's PyPI wheels, including explicit CPU requests.
+  // Other architectures retain the platform-native distribution.
   if (!cpuWheelsApply) return 'native';
   if (requested === 'cpu' || requested === 'cuda') return requested;
   if (platform === 'win32' && arch === 'arm64') return 'cpu';

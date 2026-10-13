@@ -264,3 +264,15 @@ def test_dub_generate_unknown_job(client):
     })
     assert r.status_code == 404
     assert "re-upload" in r.json()["detail"].lower()
+
+
+@pytest.mark.parametrize("error", [OSError, RuntimeError, SystemError, NotImplementedError])
+def test_sysinfo_survives_unavailable_cpu_frequency(client, monkeypatch, error):
+    import psutil
+    def unavailable():
+        raise error("invalid CPU frequency data")
+    monkeypatch.setattr(psutil, "cpu_freq", unavailable)
+    response = client.get("/sysinfo")
+    assert response.status_code == 200
+    assert response.json()["cpu_frequency_ghz"] == 0
+    assert response.json()["total_ram"] > 0

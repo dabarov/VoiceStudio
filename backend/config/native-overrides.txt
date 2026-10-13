@@ -1,0 +1,18 @@
+# Shared security/compatibility stack for optional engine environments.
+# Replaces upstream native pins; engine identity and model weights are retained.
+torch==2.13.0
+torchaudio==2.11.0
+torchvision==0.28.0
+torchcodec==0.17.0
+accelerate==1.14.0+voicestudio.1
+nltk==3.10.3+voicestudio.1
+setuptools>=83
+lightning>=2.6.6
+pytorch-lightning>=2.6.6
+
+# Security floors also apply when an engine pins an older transitive package.
+datasets>=5.0.1
+fsspec>=2026.6.0
+orjson>=3.11.6
+keras>=3.15.1
+protobuf>=5.29.6

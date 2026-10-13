@@ -219,3 +219,8 @@ def test_generate_500_detail_carries_socks_hint(client, monkeypatch):
     )
     assert "unset ALL_PROXY/HTTPS_PROXY" in detail
     assert r.json()["docs_topic"] == "SOCKS_PROXY_SUPPORT_MISSING"
+
+
+@pytest.fixture(autouse=True)
+def _resident_engine_test_host(in_process_omnivoice_host):
+    pass

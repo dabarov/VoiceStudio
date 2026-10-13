@@ -8,6 +8,12 @@ import { createRequire } from 'node:module';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
+import { DESKTOP_UPDATES_ENABLED } from '../../config/app-config.mjs';
+
+if (!DESKTOP_UPDATES_ENABLED) {
+  console.log('Upstream updates disabled: skipping AppImage update metadata.');
+  process.exit(0);
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const releaseDir = resolve(root, process.argv[2] || 'release');

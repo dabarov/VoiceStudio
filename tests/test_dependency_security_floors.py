@@ -30,6 +30,10 @@ PYTHON_FLOORS = {
     "pytorch-lightning": "2.6.6",
     "python-multipart": "0.0.31",
     "starlette": "1.3.1",
+    "setuptools": "83.0.0",
+    "torch": "2.13.0",
+    "torchaudio": "2.11.0",
+    "torchvision": "0.28.0",
     "transformers": "5.10.0",
     "yt-dlp": "2026.7.4",
 }

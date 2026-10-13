@@ -61,12 +61,11 @@ def setup_status():
 
 # ── Pre-flight System Check ───────────────────────────────────────────────
 
-# CUDA 12.x minor-version compatibility floor (the bundled cu128 runtime runs on
-# any 12.x-capable driver): R525.60.13 on Linux, R528.33 on Windows — see
+# CUDA 13.x minor-version compatibility floor: R580 on Linux and Windows. See
 # https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html
 # Compared as full versions: a Windows 527.x driver is NOT enough (#2489).
-_MIN_NVIDIA_DRIVER_LINUX = (525, 60, 13)
-_MIN_NVIDIA_DRIVER_WINDOWS = (528, 33)
+_MIN_NVIDIA_DRIVER_LINUX = (580, 0)
+_MIN_NVIDIA_DRIVER_WINDOWS = (580, 0)
 
 
 def _min_nvidia_driver(platform: str | None = None) -> tuple[int, ...]:
@@ -166,7 +165,7 @@ def _detect_gpu() -> dict:
                 info["notes"].append(
                     f"NVIDIA driver {driver} below "
                     f"{'.'.join(map(str, floor))} required "
-                    f"by the bundled CUDA 12.8 runtime — GPU will fail to launch "
+                    f"by the bundled CUDA 13.0 runtime — GPU will fail to launch "
                     f"kernels. Update drivers before dubbing."
                 )
                 info["available"] = False
